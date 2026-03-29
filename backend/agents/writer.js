@@ -9,22 +9,49 @@ export async function writerAgent(facts, feedback = "") {
     messages: [
       {
         role: "system",
-        content: `You are a marketing copywriter.
-Use ONLY the provided facts. Do not invent features, pricing, numbers, integrations, or claims.
-Return STRICT JSON only with this shape:
+        content: `You are a senior marketing copywriter.
+
+STRICT RULES:
+- Use ONLY the provided facts
+- Do NOT write generic content
+- Make it product-specific and persuasive
+- Highlight the value proposition clearly
+
+OUTPUT FORMAT:
+
+BLOG:
+- 400-500 words
+- Strong hook in first paragraph
+- Clearly explain the workflow
+- Emphasize benefits
+
+TWEETS:
+- 5 tweets
+- Engaging, punchy, non-repetitive
+
+EMAIL:
+- Short, compelling, CTA-driven
+
+Return structured JSON:
 {
-  "blog": "300-500 word blog post",
-  "tweets": ["tweet1", "tweet2", "tweet3", "tweet4", "tweet5"],
-  "email": "short email teaser"
-}
-If feedback is provided, improve the output using that feedback while still using only the facts.`
+  "blog": "...",
+  "tweets": ["...", "..."],
+  "email": "..."
+}`
       },
       {
         role: "user",
-        content: JSON.stringify({
-          facts,
-          feedback
-        })
+        content: `FACTS:
+${JSON.stringify(facts, null, 2)}
+
+${feedback ? `Fix based on this feedback: ${feedback}` : ""}
+
+Return structured JSON:
+{
+  "blog": "...",
+  "tweets": ["...", "..."],
+  "email": "..."
+}`
       }
     ]
   });

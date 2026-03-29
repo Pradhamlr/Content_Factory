@@ -9,20 +9,32 @@ export async function editorAgent(content, facts) {
     messages: [
       {
         role: "system",
-        content: `You are an editor and quality gate.
-Validate the content against the facts for hallucinations, tone, and clarity.
-Return STRICT JSON only with this exact shape:
+        content: `You are a strict Editor-in-Chief.
+
+Reject if:
+- content is generic
+- value proposition is weak
+- facts are not used properly
+- tone is boring or repetitive
+
+Approve ONLY if:
+- content is specific
+- clearly uses facts
+- compelling and structured
+
+Return STRICT JSON:
+
+If approved:
 {
-  "status": "APPROVED" or "REJECTED",
-  "content": {
-    "blog": "string",
-    "tweets": ["string"],
-    "email": "string"
-  },
-  "feedback": "string"
+  "status": "APPROVED",
+  "content": ...
 }
-If approved, return the original content in the content field.
-If rejected, keep the submitted content in the content field and provide concise actionable feedback.`
+
+If rejected:
+{
+  "status": "REJECTED",
+  "feedback": "specific improvements needed"
+}`
       },
       {
         role: "user",
@@ -33,8 +45,16 @@ If rejected, keep the submitted content in the content field and provide concise
 
   const result = safeJsonParse(response.choices?.[0]?.message?.content || "");
 
-  if (!result.status || !result.content) {
+  if (!result.status) {
     throw new Error("Editor agent returned an invalid response shape.");
+  }
+
+  if (result.status === "APPROVED" && !result.content) {
+    throw new Error("Editor agent approved content without returning content.");
+  }
+
+  if (result.status === "REJECTED" && !result.feedback) {
+    throw new Error("Editor agent rejected content without feedback.");
   }
 
   await logAgentRun("editor", {
