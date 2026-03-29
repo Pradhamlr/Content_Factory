@@ -1,0 +1,9 @@
+{
+  "name": "autonomous-content-factory-client",
+  "private": true,
+  "scripts": {
+    "dev": "node ../node_modules/vite/bin/vite.js --config vite.config.js",
+    "build": "node ../node_modules/vite/bin/vite.js build --config vite.config.js",
+    "preview": "node ../node_modules/vite/bin/vite.js preview --config vite.config.js"
+  }
+}
