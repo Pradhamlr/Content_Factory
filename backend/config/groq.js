@@ -7,6 +7,6 @@ if (!apiKey) {
 }
 
 const groq = new Groq({ apiKey });
-const MODEL = "mixtral-8x7b-32768";
+const MODEL = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
 
 export { groq, MODEL };

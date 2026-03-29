@@ -84,6 +84,7 @@ Then add your Groq key in `backend/.env`:
 
 ```env
 GROQ_API_KEY=your_key_here
+GROQ_MODEL=llama-3.3-70b-versatile
 PORT=4000
 ```
 
@@ -125,7 +126,8 @@ curl -X POST http://localhost:4000/api/generate \
 
 - `.env` files are ignored through the root `.gitignore`
 - the frontend proxies `/api` requests to `http://localhost:4000`
-- `mixtral-8x7b-32768` is currently configured in the backend because that was your requested model
+- the backend defaults to `llama-3.3-70b-versatile`
+- you can override the model with `GROQ_MODEL` in `backend/.env`
 
 ## Next Good Steps
 

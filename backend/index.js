@@ -1,6 +1,8 @@
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
+import { MODEL } from "./config/groq.js";
+import { logFilePath } from "./utils/agentLogger.js";
 import generateRouter from "./routes/generate.js";
 
 const app = express();
@@ -29,4 +31,6 @@ app.use((err, req, res, next) => {
 
 app.listen(PORT, () => {
   console.log(`Autonomous Content Factory backend running on http://localhost:${PORT}`);
+  console.log(`Groq model: ${MODEL}`);
+  console.log(`Agent logs: ${logFilePath}`);
 });

@@ -1,4 +1,5 @@
 import { groq, MODEL } from "../config/groq.js";
+import { logAgentRun } from "../utils/agentLogger.js";
 import { safeJsonParse } from "../utils/safeJson.js";
 
 export async function researcherAgent(input) {
@@ -26,5 +27,13 @@ Do not add any explanation.`
   });
 
   const content = response.choices?.[0]?.message?.content || "";
-  return safeJsonParse(content);
+  const parsed = safeJsonParse(content);
+
+  await logAgentRun("researcher", {
+    model: MODEL,
+    inputPreview: input.slice(0, 400),
+    output: parsed
+  });
+
+  return parsed;
 }

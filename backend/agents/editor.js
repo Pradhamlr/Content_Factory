@@ -1,4 +1,5 @@
 import { groq, MODEL } from "../config/groq.js";
+import { logAgentRun } from "../utils/agentLogger.js";
 import { safeJsonParse } from "../utils/safeJson.js";
 
 export async function editorAgent(content, facts) {
@@ -35,6 +36,13 @@ If rejected, keep the submitted content in the content field and provide concise
   if (!result.status || !result.content) {
     throw new Error("Editor agent returned an invalid response shape.");
   }
+
+  await logAgentRun("editor", {
+    model: MODEL,
+    facts,
+    submittedContent: content,
+    output: result
+  });
 
   return result;
 }

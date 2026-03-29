@@ -1,4 +1,5 @@
 import { groq, MODEL } from "../config/groq.js";
+import { logAgentRun } from "../utils/agentLogger.js";
 import { safeJsonParse } from "../utils/safeJson.js";
 
 export async function writerAgent(facts, feedback = "") {
@@ -29,5 +30,14 @@ If feedback is provided, improve the output using that feedback while still usin
   });
 
   const content = response.choices?.[0]?.message?.content || "";
-  return safeJsonParse(content);
+  const parsed = safeJsonParse(content);
+
+  await logAgentRun("writer", {
+    model: MODEL,
+    feedback,
+    facts,
+    output: parsed
+  });
+
+  return parsed;
 }
