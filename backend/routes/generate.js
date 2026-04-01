@@ -1,14 +1,42 @@
 import { Router } from "express";
+import crypto from "crypto";
 import { researcherAgent } from "../agents/researcher.js";
 import { writerAgent } from "../agents/writer.js";
 import { editorAgent } from "../agents/editor.js";
+import { addStream, publish, removeStream } from "../utils/requestEvents.js";
 
 const router = Router();
 const MAX_RETRIES = 2;
 
+router.get("/stream", (req, res) => {
+  const requestId = req.query.requestId;
+
+  if (!requestId || typeof requestId !== "string") {
+    res.status(400).json({ error: "requestId query parameter is required." });
+    return;
+  }
+
+  res.writeHead(200, {
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache",
+    Connection: "keep-alive"
+  });
+
+  addStream(requestId, res);
+  publish(requestId, "connected", {
+    requestId,
+    message: "War room stream connected."
+  });
+
+  req.on("close", () => {
+    removeStream(requestId, res);
+  });
+});
+
 router.post("/", async (req, res, next) => {
   try {
     const input = req.body?.input;
+    const requestId = req.body?.requestId || crypto.randomUUID();
 
     if (!input || typeof input !== "string" || !input.trim()) {
       return res.status(400).json({
@@ -16,7 +44,13 @@ router.post("/", async (req, res, next) => {
       });
     }
 
-    const facts = await researcherAgent(input.trim());
+    publish(requestId, "lifecycle", {
+      requestId,
+      status: "started",
+      message: "Campaign generation started."
+    });
+
+    const facts = await researcherAgent(input.trim(), { requestId });
 
     let attempts = 0;
     let feedback = "";
@@ -25,9 +59,14 @@ router.post("/", async (req, res, next) => {
 
     while (attempts <= MAX_RETRIES) {
       attempts += 1;
+      publish(requestId, "attempt", {
+        requestId,
+        attempt: attempts,
+        message: `Writer attempt ${attempts} started.`
+      });
 
-      const draft = await writerAgent(facts, feedback);
-      const review = await editorAgent(draft, facts);
+      const draft = await writerAgent(facts, feedback, { requestId });
+      const review = await editorAgent(draft, facts, { requestId });
 
       finalContent = review.content || draft;
       finalReview = review;
@@ -39,7 +78,15 @@ router.post("/", async (req, res, next) => {
       feedback = review.feedback || "Please improve clarity and align strictly with the facts.";
     }
 
+    publish(requestId, "complete", {
+      requestId,
+      status: finalReview?.status || "REJECTED",
+      attempts,
+      message: "Campaign generation finished."
+    });
+
     res.json({
+      requestId,
       facts,
       content: finalContent,
       attempts,

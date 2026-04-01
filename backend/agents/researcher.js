@@ -1,8 +1,17 @@
 import { groq, MODEL } from "../config/groq.js";
 import { logAgentRun } from "../utils/agentLogger.js";
 import { safeJsonParse } from "../utils/safeJson.js";
+import { publish } from "../utils/requestEvents.js";
 
-export async function researcherAgent(input) {
+export async function researcherAgent(input, context = {}) {
+  if (context.requestId) {
+    publish(context.requestId, "stage", {
+      stage: "researcher",
+      status: "running",
+      message: "Analytical Brain is extracting the source of truth."
+    });
+  }
+
   const response = await groq.chat.completions.create({
     model: MODEL,
     temperature: 0.2,
@@ -46,10 +55,19 @@ Do not add explanations, markdown, or extra keys.`
   const parsed = safeJsonParse(content);
 
   await logAgentRun("researcher", {
+    requestId: context.requestId,
     model: MODEL,
     inputPreview: input.slice(0, 400),
     output: parsed
   });
+
+  if (context.requestId) {
+    publish(context.requestId, "stage", {
+      stage: "researcher",
+      status: "complete",
+      message: "Analytical Brain completed extraction."
+    });
+  }
 
   return parsed;
 }

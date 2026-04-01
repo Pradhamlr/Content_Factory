@@ -1,8 +1,17 @@
 import { groq, MODEL } from "../config/groq.js";
 import { logAgentRun } from "../utils/agentLogger.js";
 import { safeJsonParse } from "../utils/safeJson.js";
+import { publish } from "../utils/requestEvents.js";
 
-export async function writerAgent(facts, feedback = "") {
+export async function writerAgent(facts, feedback = "", context = {}) {
+  if (context.requestId) {
+    publish(context.requestId, "stage", {
+      stage: "writer",
+      status: "running",
+      message: feedback ? "The Voice is revising the draft with editor feedback." : "The Voice is generating channel content."
+    });
+  }
+
   const response = await groq.chat.completions.create({
     model: MODEL,
     temperature: 0.5,
@@ -60,11 +69,20 @@ Return structured JSON:
   const parsed = safeJsonParse(content);
 
   await logAgentRun("writer", {
+    requestId: context.requestId,
     model: MODEL,
     feedback,
     facts,
     output: parsed
   });
+
+  if (context.requestId) {
+    publish(context.requestId, "stage", {
+      stage: "writer",
+      status: "complete",
+      message: "The Voice delivered a structured content draft."
+    });
+  }
 
   return parsed;
 }
