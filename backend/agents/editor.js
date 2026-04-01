@@ -3,6 +3,25 @@ import { logAgentRun } from "../utils/agentLogger.js";
 import { safeJsonParse } from "../utils/safeJson.js";
 import { publish } from "../utils/requestEvents.js";
 
+function normalizeApprovedContent(content) {
+  if (!content || typeof content !== "object") {
+    return content;
+  }
+
+  return {
+    blog: typeof content.blog === "string" ? content.blog.trim() : "",
+    tweets: Array.isArray(content.tweets) ? content.tweets : [],
+    email:
+      typeof content.email === "string"
+        ? content.email.trim()
+        : typeof content.emailTeaser === "string"
+        ? content.emailTeaser.trim()
+        : typeof content.email_teaser === "string"
+        ? content.email_teaser.trim()
+        : ""
+  };
+}
+
 export async function editorAgent(content, facts, context = {}) {
   if (context.requestId) {
     publish(context.requestId, "stage", {
@@ -64,6 +83,10 @@ If rejected:
 
   if (result.status === "REJECTED" && !result.feedback) {
     throw new Error("Editor agent rejected content without feedback.");
+  }
+
+  if (result.status === "APPROVED") {
+    result.content = normalizeApprovedContent(result.content);
   }
 
   await logAgentRun("editor", {

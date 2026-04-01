@@ -254,7 +254,7 @@ button {
 .app-topbar__system {
   display: flex;
   align-items: center;
-  gap: 2rem;
+  gap: 0;
 }
 
 .app-topbar__system-name {
@@ -635,6 +635,7 @@ button {
   background: var(--surface-low);
   text-align: center;
   transition: all 500ms ease;
+  opacity: 0.78;
 }
 
 .war-agent-card.is-gatekeeper {
@@ -642,15 +643,18 @@ button {
 }
 
 .war-agent-card.is-active {
+  opacity: 1;
   border-color: rgba(0, 240, 255, 0.4);
   box-shadow: 0 0 25px rgba(0, 240, 255, 0.15), inset 0 0 10px rgba(0, 240, 255, 0.1);
 }
 
 .war-agent-card.is-complete:not(.is-active) {
+  opacity: 1;
   border-color: rgba(155, 240, 0, 0.25);
 }
 
 .war-agent-card.is-blocked {
+  opacity: 1;
   border-color: rgba(255, 180, 171, 0.4);
 }
 
@@ -667,11 +671,20 @@ button {
   overflow: hidden;
 }
 
+.war-agent-card:not(.is-active):not(.is-complete) .war-agent-card__icon {
+  border-color: rgba(132, 148, 149, 0.28);
+  background: rgba(45, 52, 73, 0.7);
+}
+
 .war-agent-card__icon .material-symbols-outlined {
   position: relative;
   z-index: 1;
   font-size: 2rem;
   color: var(--primary);
+}
+
+.war-agent-card:not(.is-active):not(.is-complete) .war-agent-card__icon .material-symbols-outlined {
+  color: rgba(148, 163, 184, 0.45);
 }
 
 .war-agent-card__status-dot {
@@ -681,9 +694,9 @@ button {
   width: 0.78rem;
   height: 0.78rem;
   border-radius: 999px;
-  background: rgba(155, 240, 0, 0.18);
+  background: rgba(148, 163, 184, 0.1);
   border: 2px solid var(--surface-low);
-  box-shadow: inset 0 0 0 1px rgba(155, 240, 0, 0.18);
+  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.12);
 }
 
 .war-agent-card__status-dot.is-on {
@@ -745,6 +758,10 @@ button {
   text-transform: uppercase;
 }
 
+.war-agent-card:not(.is-active):not(.is-complete) h3 {
+  color: rgba(148, 163, 184, 0.55);
+}
+
 .war-agent-card.is-gatekeeper h3 {
   opacity: 0.6;
 }
@@ -760,6 +777,10 @@ button {
 
 .war-agent-card.is-active .war-agent-card__status {
   color: var(--primary);
+}
+
+.war-agent-card.is-complete .war-agent-card__status {
+  color: rgba(155, 240, 0, 0.9);
 }
 
 .war-room-stream {
@@ -1173,6 +1194,16 @@ button {
   font-weight: 800;
   letter-spacing: 0.12em;
   text-transform: uppercase;
+}
+
+.review-page__icon-button:hover,
+.review-content__tool:hover,
+.preview-page__secondary:hover,
+.preview-page__primary:hover,
+.review-page__export:hover,
+.review-content__secondary:hover,
+.review-content__primary:hover {
+  opacity: 0.95;
 }
 
 .review-layout {
@@ -1682,10 +1713,12 @@ button {
   margin: 0 0 1.2rem;
   color: #1e1b4b;
   font-family: "Space Grotesk", sans-serif;
-  font-size: 2rem;
-  line-height: 1.15;
+  font-size: 1.4rem;
+  line-height: 1.25;
   font-weight: 800;
   letter-spacing: -0.04em;
+  max-width: 38rem;
+  overflow-wrap: anywhere;
 }
 
 .browser-article__image {

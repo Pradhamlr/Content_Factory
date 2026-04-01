@@ -3,6 +3,27 @@ import { logAgentRun } from "../utils/agentLogger.js";
 import { safeJsonParse } from "../utils/safeJson.js";
 import { publish } from "../utils/requestEvents.js";
 
+function normalizeWriterOutput(parsed) {
+  const tweets = Array.isArray(parsed?.tweets)
+    ? parsed.tweets
+    : typeof parsed?.thread === "string"
+    ? parsed.thread.split(/\n+/).filter(Boolean)
+    : [];
+
+  return {
+    blog: typeof parsed?.blog === "string" ? parsed.blog.trim() : "",
+    tweets,
+    email:
+      typeof parsed?.email === "string"
+        ? parsed.email.trim()
+        : typeof parsed?.emailTeaser === "string"
+        ? parsed.emailTeaser.trim()
+        : typeof parsed?.email_teaser === "string"
+        ? parsed.email_teaser.trim()
+        : ""
+  };
+}
+
 export async function writerAgent(facts, feedback = "", context = {}) {
   if (context.requestId) {
     publish(context.requestId, "stage", {
@@ -66,7 +87,7 @@ Return structured JSON:
   });
 
   const content = response.choices?.[0]?.message?.content || "";
-  const parsed = safeJsonParse(content);
+  const parsed = normalizeWriterOutput(safeJsonParse(content));
 
   await logAgentRun("writer", {
     requestId: context.requestId,

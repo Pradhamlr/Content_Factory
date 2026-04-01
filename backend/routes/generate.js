@@ -4,9 +4,11 @@ import { researcherAgent } from "../agents/researcher.js";
 import { writerAgent } from "../agents/writer.js";
 import { editorAgent } from "../agents/editor.js";
 import { addStream, publish, removeStream } from "../utils/requestEvents.js";
+import { delay } from "../utils/delay.js";
 
 const router = Router();
 const MAX_RETRIES = 2;
+const UX_DELAY_MS = 900;
 
 router.get("/stream", (req, res) => {
   const requestId = req.query.requestId;
@@ -49,8 +51,10 @@ router.post("/", async (req, res, next) => {
       status: "started",
       message: "Campaign generation started."
     });
+    await delay(500);
 
     const facts = await researcherAgent(input.trim(), { requestId });
+    await delay(UX_DELAY_MS);
 
     let attempts = 0;
     let feedback = "";
@@ -64,9 +68,12 @@ router.post("/", async (req, res, next) => {
         attempt: attempts,
         message: `Writer attempt ${attempts} started.`
       });
+      await delay(500);
 
       const draft = await writerAgent(facts, feedback, { requestId });
+      await delay(UX_DELAY_MS);
       const review = await editorAgent(draft, facts, { requestId });
+      await delay(UX_DELAY_MS);
 
       finalContent = review.content || draft;
       finalReview = review;
@@ -76,6 +83,7 @@ router.post("/", async (req, res, next) => {
       }
 
       feedback = review.feedback || "Please improve clarity and align strictly with the facts.";
+      await delay(700);
     }
 
     publish(requestId, "complete", {

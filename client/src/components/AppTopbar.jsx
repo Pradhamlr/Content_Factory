@@ -23,7 +23,6 @@ export default function AppTopbar({ activeView, status, requestId }) {
   return (
     <header className="app-topbar">
       <div className="app-topbar__system">
-        <div className="app-topbar__system-name">MARTECH_OS</div>
         <label className="app-topbar__search">
           <span className="material-symbols-outlined app-topbar__search-symbol" aria-hidden="true">search</span>
           <input type="text" placeholder="Search System..." aria-label={`Search ${current.title}`} />

@@ -29,15 +29,38 @@ export default function AgentsView({ liveLogs, agentStages, loading, result, has
       ]
     : [];
 
+  const researcherStatus = agentStages.researcher.status;
+  const writerStatus = agentStages.writer.status;
+  const editorStatus = agentStages.editor.status;
+
   return (
     <div className="war-room-page">
       <div className="war-room-main">
         <div className="war-room-agents">
-          <AgentCard title="ANALYTICAL BRAIN" status={agentStages.researcher.status} complete={agentStages.researcher.status === "complete"} accent="brain" />
+          <AgentCard
+            title="ANALYTICAL BRAIN"
+            status={researcherStatus}
+            active={researcherStatus === "running"}
+            complete={researcherStatus === "complete"}
+            accent="brain"
+          />
           <div className="war-room-link"></div>
-          <AgentCard title="THE VOICE" status={agentStages.writer.status} active={agentStages.writer.status === "running"} complete={agentStages.writer.status === "complete"} accent="voice" />
+          <AgentCard
+            title="THE VOICE"
+            status={writerStatus}
+            active={writerStatus === "running"}
+            complete={writerStatus === "complete"}
+            accent="voice"
+          />
           <div className="war-room-link"></div>
-          <AgentCard title="THE GATEKEEPER" status={agentStages.editor.status} blocked={agentStages.editor.status === "rejected"} complete={agentStages.editor.status === "complete"} accent="gatekeeper" />
+          <AgentCard
+            title="THE GATEKEEPER"
+            status={editorStatus}
+            active={editorStatus === "running"}
+            blocked={editorStatus === "rejected"}
+            complete={editorStatus === "complete"}
+            accent="gatekeeper"
+          />
         </div>
 
         <section className="war-room-stream">

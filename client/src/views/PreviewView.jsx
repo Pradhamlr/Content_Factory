@@ -3,8 +3,16 @@ function getBlogTitle(blog) {
     return "";
   }
 
-  const [firstLine] = blog.split("\n").filter(Boolean);
-  return firstLine?.slice(0, 72) || "";
+  const clean = blog
+    .replace(/^#+\s*/gm, "")
+    .replace(/\*\*/g, "")
+    .trim();
+  const lines = clean.split("\n").map((line) => line.trim()).filter(Boolean);
+  const candidate = lines.find((line) => line.length > 12 && line.length < 90) || "";
+  const firstSentence = candidate.split(/[.!?]/)[0]?.trim() || "";
+  const title = firstSentence.length >= 18 ? firstSentence : candidate;
+
+  return title.slice(0, 78);
 }
 
 function getBlogExcerpt(blog) {
@@ -12,14 +20,18 @@ function getBlogExcerpt(blog) {
     return "";
   }
 
-  const text = blog.replace(/\s+/g, " ").trim();
+  const text = blog
+    .replace(/^#+\s*/gm, "")
+    .replace(/\*\*/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
   return text.slice(0, 150) + (text.length > 150 ? "..." : "");
 }
 
 export default function PreviewView({ result, onExport, hasCampaign }) {
   const blog = result?.content?.blog || "";
   const tweets = Array.isArray(result?.content?.tweets) ? result.content.tweets : [];
-  const firstTweet = tweets[0] || "";
+  const firstTweet = tweets[0] || result?.content?.email || "";
   const seoScore = hasCampaign ? Math.min(99, 90 + Math.min(5, tweets.length)) : "--";
   const omniImpact = hasCampaign ? `${Math.min(99, 82 + tweets.length * 2)}%` : "--";
   const loadPerformance = hasCampaign ? `${Math.max(0.8, 1.4 - tweets.length * 0.1).toFixed(1)}s` : "--";
