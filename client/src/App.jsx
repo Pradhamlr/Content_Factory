@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import AppSidebar from "./components/AppSidebar";
 import AppTopbar from "./components/AppTopbar";
-import { api, buildExportFile } from "./lib/api";
+import { api, buildCampaignKitFile, buildExportFile } from "./lib/api";
 import CampaignsView from "./views/CampaignsView";
 import AgentsView from "./views/AgentsView";
 import PlaceholderView from "./views/PlaceholderView";
@@ -23,6 +23,18 @@ export default function App() {
   const [requestId, setRequestId] = useState("");
   const [liveLogs, setLiveLogs] = useState([]);
   const [agentStages, setAgentStages] = useState(initialAgentStages);
+  const [approvedTabs, setApprovedTabs] = useState({
+    blog: false,
+    tweets: false,
+    email: false
+  });
+  const [reviewActionLoading, setReviewActionLoading] = useState(false);
+  const [deployment, setDeployment] = useState({
+    deployed: false,
+    deployedAt: null,
+    deployedChannels: []
+  });
+  const [previewActionLoading, setPreviewActionLoading] = useState(false);
   const eventSourceRef = useRef(null);
   const hasCampaign = Boolean(requestId) || loading || Boolean(result);
 
@@ -36,6 +48,16 @@ export default function App() {
     setRequestId(nextRequestId);
     setLiveLogs([]);
     setAgentStages(initialAgentStages);
+    setApprovedTabs({
+      blog: false,
+      tweets: false,
+      email: false
+    });
+    setDeployment({
+      deployed: false,
+      deployedAt: null,
+      deployedChannels: []
+    });
   }
 
   function appendLog(message, type = "system", timestamp = new Date().toISOString()) {
@@ -104,6 +126,16 @@ export default function App() {
 
       setResult(payload);
       setRequestId(payload.requestId || nextRequestId);
+      setApprovedTabs(payload.approvals || {
+        blog: false,
+        tweets: false,
+        email: false
+      });
+      setDeployment(payload.deployment || {
+        deployed: false,
+        deployedAt: null,
+        deployedChannels: []
+      });
     } catch (nextError) {
       setError(nextError.message);
       setResult(null);
@@ -119,6 +151,114 @@ export default function App() {
     }
 
     buildExportFile(`campaign-result-${requestId || "latest"}.json`, result);
+  }
+
+  async function handleRegenerateChannel(channel) {
+    if (!result?.facts || !result?.content || reviewActionLoading) {
+      return;
+    }
+
+    setReviewActionLoading(true);
+    setError("");
+
+    try {
+      const payload = await api("/api/generate/regenerate", {
+        method: "POST",
+        body: JSON.stringify({
+          requestId,
+          channel,
+          facts: result.facts,
+          currentContent: result.content
+        })
+      });
+
+      setResult((current) => ({
+        ...current,
+        content: payload.content,
+        status: payload.status === "APPROVED" ? "APPROVED" : current?.status || "REJECTED",
+        feedback: payload.feedback || current?.feedback || ""
+      }));
+
+      setApprovedTabs(payload.approvals || {
+        blog: false,
+        tweets: false,
+        email: false
+      });
+      setDeployment(payload.deployment || {
+        deployed: false,
+        deployedAt: null,
+        deployedChannels: []
+      });
+    } catch (nextError) {
+      setError(nextError.message);
+    } finally {
+      setReviewActionLoading(false);
+    }
+  }
+
+  async function handleApproveChannel(channel) {
+    if (!requestId) {
+      return;
+    }
+
+    setError("");
+
+    try {
+      const payload = await api("/api/generate/approve", {
+        method: "POST",
+        body: JSON.stringify({
+          requestId,
+          channel
+        })
+      });
+
+      setApprovedTabs(payload.approvals || {
+        blog: false,
+        tweets: false,
+        email: false
+      });
+    } catch (nextError) {
+      setError(nextError.message);
+    }
+  }
+
+  async function handleDeployCampaign() {
+    if (!requestId || previewActionLoading) {
+      return;
+    }
+
+    setPreviewActionLoading(true);
+    setError("");
+
+    try {
+      const payload = await api("/api/generate/deploy", {
+        method: "POST",
+        body: JSON.stringify({ requestId })
+      });
+
+      setDeployment(payload.deployment || {
+        deployed: false,
+        deployedAt: null,
+        deployedChannels: []
+      });
+    } catch (nextError) {
+      setError(nextError.message);
+    } finally {
+      setPreviewActionLoading(false);
+    }
+  }
+
+  function downloadCampaignKit() {
+    if (!result) {
+      return;
+    }
+
+    buildCampaignKitFile(`campaign-kit-${requestId || "latest"}.md`, {
+      input,
+      result,
+      approvals: approvedTabs,
+      deployment
+    });
   }
 
   return (
@@ -143,10 +283,32 @@ export default function App() {
           {activeView === "agents" ? <AgentsView liveLogs={liveLogs} agentStages={agentStages} loading={loading} result={result} hasCampaign={hasCampaign} /> : null}
 
           {activeView === "analysis" ? (
-            <ReviewView input={input} result={result} onExport={downloadResultJson} hasCampaign={hasCampaign} />
+            <ReviewView
+              input={input}
+              result={result}
+              onExport={downloadResultJson}
+              hasCampaign={hasCampaign}
+              approvedTabs={approvedTabs}
+              onApproveChannel={handleApproveChannel}
+              onRegenerateChannel={handleRegenerateChannel}
+              actionLoading={reviewActionLoading}
+              error={error}
+            />
           ) : null}
 
-          {activeView === "preview" ? <PreviewView result={result} onExport={downloadResultJson} hasCampaign={hasCampaign} /> : null}
+          {activeView === "preview" ? (
+            <PreviewView
+              result={result}
+              onExport={downloadResultJson}
+              onExportKit={downloadCampaignKit}
+              onDeploy={handleDeployCampaign}
+              hasCampaign={hasCampaign}
+              approvedTabs={approvedTabs}
+              deployment={deployment}
+              actionLoading={previewActionLoading}
+              error={error}
+            />
+          ) : null}
 
           {activeView === "settings" ? (
             <PlaceholderView title="Settings" description="This view is intentionally deferred while the primary production screens are refined." />

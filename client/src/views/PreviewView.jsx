@@ -3,10 +3,7 @@ function getBlogTitle(blog) {
     return "";
   }
 
-  const clean = blog
-    .replace(/^#+\s*/gm, "")
-    .replace(/\*\*/g, "")
-    .trim();
+  const clean = blog.replace(/^#+\s*/gm, "").replace(/\*\*/g, "").trim();
   const lines = clean.split("\n").map((line) => line.trim()).filter(Boolean);
   const candidate = lines.find((line) => line.length > 12 && line.length < 90) || "";
   const firstSentence = candidate.split(/[.!?]/)[0]?.trim() || "";
@@ -15,28 +12,61 @@ function getBlogTitle(blog) {
   return title.slice(0, 78);
 }
 
-function getBlogExcerpt(blog) {
+function getBlogParagraphs(blog) {
   if (!blog) {
+    return [];
+  }
+
+  return blog
+    .replace(/^#+\s*/gm, "")
+    .replace(/\*\*/g, "")
+    .split(/\n\s*\n/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .slice(0, 3);
+}
+
+function getEmailHeadline(email) {
+  if (!email) {
     return "";
   }
 
-  const text = blog
-    .replace(/^#+\s*/gm, "")
-    .replace(/\*\*/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-  return text.slice(0, 150) + (text.length > 150 ? "..." : "");
+  const clean = email.replace(/^subject:\s*/im, "").trim();
+  return clean.split(/[.!?]/)[0]?.trim() || clean.slice(0, 90);
 }
 
-export default function PreviewView({ result, onExport, hasCampaign }) {
+function formatDeployLabel(deployment) {
+  if (!deployment?.deployed) {
+    return "Waiting for Deployment";
+  }
+
+  return `Deployed • ${deployment.deployedChannels.length} channel${deployment.deployedChannels.length === 1 ? "" : "s"}`;
+}
+
+export default function PreviewView({
+  result,
+  onExport,
+  onExportKit,
+  onDeploy,
+  hasCampaign,
+  approvedTabs,
+  deployment,
+  actionLoading,
+  error
+}) {
   const blog = result?.content?.blog || "";
   const tweets = Array.isArray(result?.content?.tweets) ? result.content.tweets : [];
-  const firstTweet = tweets[0] || result?.content?.email || "";
-  const seoScore = hasCampaign ? Math.min(99, 90 + Math.min(5, tweets.length)) : "--";
-  const omniImpact = hasCampaign ? `${Math.min(99, 82 + tweets.length * 2)}%` : "--";
-  const loadPerformance = hasCampaign ? `${Math.max(0.8, 1.4 - tweets.length * 0.1).toFixed(1)}s` : "--";
-  const visualSync = hasCampaign ? "System Token Sync: 100%" : "Visual system data not available yet";
-  const loadTrackWidth = hasCampaign ? `${Math.min(100, 78 + tweets.length * 4)}%` : "0%";
+  const email = result?.content?.email || "";
+  const blogTitle = getBlogTitle(blog);
+  const blogParagraphs = getBlogParagraphs(blog);
+  const firstTweet = tweets[0] || "";
+  const approvedCount = Object.values(approvedTabs || {}).filter(Boolean).length;
+  const seoScore = hasCampaign ? Math.min(99, 84 + approvedCount * 4 + Math.min(5, blogParagraphs.length)) : "--";
+  const omniImpact = hasCampaign ? `${Math.min(100, 48 + approvedCount * 14 + tweets.length * 3)}%` : "--";
+  const loadPerformance = hasCampaign && result?.telemetry?.durationMs ? `${(result.telemetry.durationMs / 1000).toFixed(1)}s` : "--";
+  const visualSync = hasCampaign ? `${approvedCount}/3 channels approved` : "No review data yet";
+  const deployLabel = formatDeployLabel(deployment);
+  const deploymentTime = deployment?.deployedAt ? new Date(deployment.deployedAt).toLocaleString() : "Not deployed";
 
   return (
     <section className="preview-page">
@@ -53,7 +83,7 @@ export default function PreviewView({ result, onExport, hasCampaign }) {
             <span className="material-symbols-outlined">download</span>
             <span>Export Assets</span>
           </button>
-          <button type="button" className="preview-page__primary" onClick={onExport}>
+          <button type="button" className="preview-page__primary" onClick={onExportKit}>
             <span className="material-symbols-outlined">package_2</span>
             <span>Export Campaign Kit</span>
           </button>
@@ -77,15 +107,36 @@ export default function PreviewView({ result, onExport, hasCampaign }) {
                 <span></span>
                 <span></span>
               </div>
-              <div className="browser-preview__url">autonomous-factory.ai/blog/neon-pulse</div>
+              <div className="browser-preview__url">autonomous-factory.ai/blog/live-campaign</div>
             </div>
 
             <div className="browser-preview__body">
               <article className="browser-article">
-                {hasCampaign ? <span className="browser-article__tag">Future Tech</span> : null}
-                <h3>{hasCampaign ? getBlogTitle(blog) : "Desktop preview will appear after generation"}</h3>
-                <div className="browser-article__image"></div>
-                <p>{hasCampaign ? getBlogExcerpt(blog) : "Generated blog content is rendered here once the campaign has been started and approved."}</p>
+                {hasCampaign ? <span className="browser-article__tag">Campaign Story</span> : null}
+                <h3>{hasCampaign ? blogTitle || "Desktop preview will appear after generation" : "Desktop preview will appear after generation"}</h3>
+
+                <div className="browser-article__snapshot">
+                  <div>
+                    <span>Approved</span>
+                    <strong>{approvedTabs?.blog ? "Blog approved" : "Review pending"}</strong>
+                  </div>
+                  <div>
+                    <span>Thread ready</span>
+                    <strong>{tweets.length ? `${tweets.length} social posts` : "No thread yet"}</strong>
+                  </div>
+                  <div>
+                    <span>Email status</span>
+                    <strong>{email ? "Teaser available" : "No teaser yet"}</strong>
+                  </div>
+                </div>
+
+                <div className="browser-article__content">
+                  {hasCampaign && blogParagraphs.length ? (
+                    blogParagraphs.map((paragraph, index) => <p key={`${index}-${paragraph.slice(0, 20)}`}>{paragraph}</p>)
+                  ) : (
+                    <p>Generated blog content is rendered here once the campaign has been started and approved.</p>
+                  )}
+                </div>
               </article>
             </div>
           </div>
@@ -120,11 +171,24 @@ export default function PreviewView({ result, onExport, hasCampaign }) {
                       <span>Factory Architect</span>
                       <span className="material-symbols-outlined">verified</span>
                     </div>
-                    <p>{hasCampaign ? firstTweet : "Social preview becomes available after the first campaign run."}</p>
+                    <p>{hasCampaign ? firstTweet || getEmailHeadline(email) : "Social preview becomes available after the first campaign run."}</p>
                   </div>
                 </div>
 
-                <div className="phone-preview__image"></div>
+                <div className="phone-preview__content-card">
+                  <div className="phone-preview__content-metric">
+                    <span>Thread length</span>
+                    <strong>{tweets.length || 0} posts</strong>
+                  </div>
+                  <div className="phone-preview__content-metric">
+                    <span>Email teaser</span>
+                    <strong>{email ? "Ready" : "Missing"}</strong>
+                  </div>
+                  <div className="phone-preview__content-metric">
+                    <span>Deployment</span>
+                    <strong>{deployment?.deployed ? "Live" : "Pending"}</strong>
+                  </div>
+                </div>
 
                 <div className="phone-preview__actions">
                   <span className="material-symbols-outlined">chat_bubble</span>
@@ -138,56 +202,54 @@ export default function PreviewView({ result, onExport, hasCampaign }) {
         </section>
       </div>
 
+      {error ? <div className="preview-page__error">{error}</div> : null}
+
       <div className="preview-stats">
         <div className="preview-stat">
           <div className="preview-stat__label">
             <span className="material-symbols-outlined">analytics</span>
             <span>Omni-Channel Impact</span>
           </div>
-          <strong>{hasCampaign ? <>{omniImpact} <em>+5.2%</em></> : "--"}</strong>
-          <p>{hasCampaign ? "Optimized for cross-device consistency" : "No performance data until a campaign is generated"}</p>
+          <strong>{omniImpact}</strong>
+          <p>{hasCampaign ? "Derived from approved channels and multi-format output readiness" : "No performance data until a campaign is generated"}</p>
         </div>
 
         <div className="preview-stat">
           <div className="preview-stat__label">
             <span className="material-symbols-outlined">speed</span>
-            <span>Load Performance</span>
+            <span>Pipeline Runtime</span>
           </div>
           <div className="preview-stat__track">
-            <div style={{ width: loadTrackWidth }}></div>
+            <div style={{ width: hasCampaign ? `${Math.min(100, 35 + approvedCount * 18)}%` : "0%" }}></div>
           </div>
           <p>{loadPerformance}</p>
         </div>
 
         <div className="preview-stat">
           <div className="preview-stat__label">
-            <span className="material-symbols-outlined">palette</span>
-            <span>Visual Alignment</span>
+            <span className="material-symbols-outlined">rule</span>
+            <span>Approval State</span>
           </div>
-          <div className="preview-stat__swatches">
-            <span></span>
-            <span></span>
-            <span></span>
-            <span></span>
-          </div>
-          <p>{visualSync}</p>
+          <strong>{visualSync}</strong>
+          <p>{hasCampaign ? `Blog ${approvedTabs?.blog ? "approved" : "pending"}, social ${approvedTabs?.tweets ? "approved" : "pending"}, email ${approvedTabs?.email ? "approved" : "pending"}` : "No approval data yet"}</p>
         </div>
 
         <div className="preview-stat">
           <div className="preview-stat__label">
-            <span className="material-symbols-outlined">sync_saved_locally</span>
-            <span>Live Status</span>
+            <span className="material-symbols-outlined">cloud_upload</span>
+            <span>Deployment</span>
           </div>
           <div className="preview-stat__status">
             <span></span>
-            <strong>{hasCampaign ? "Waiting for Deployment" : "Idle"}</strong>
+            <strong>{deployLabel}</strong>
           </div>
+          <p>{deploymentTime}</p>
         </div>
       </div>
 
       <div className="preview-fab">
-        <button type="button" onClick={onExport}>
-          <span>Deploy All Channels</span>
+        <button type="button" onClick={onDeploy} disabled={!hasCampaign || actionLoading}>
+          <span>{actionLoading ? "Deploying..." : "Deploy All Channels"}</span>
           <span className="material-symbols-outlined">send</span>
         </button>
       </div>

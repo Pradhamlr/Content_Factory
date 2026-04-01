@@ -201,13 +201,25 @@ function EmailReview({ email }) {
   );
 }
 
-export default function ReviewView({ input, result, onExport, hasCampaign }) {
+export default function ReviewView({
+  input,
+  result,
+  onExport,
+  hasCampaign,
+  approvedTabs,
+  onApproveChannel,
+  onRegenerateChannel,
+  actionLoading,
+  error
+}) {
   const [activeTab, setActiveTab] = useState("blog");
 
   const sourceText = hasCampaign ? input?.trim() || "" : "";
   const content = result?.content || {};
-  const qualityScore = !hasCampaign ? "--" : result?.status === "APPROVED" ? "98" : "84";
+  const approvedCount = Object.values(approvedTabs || {}).filter(Boolean).length;
+  const qualityScore = !hasCampaign ? "--" : String(84 + approvedCount * 4);
   const activeMeta = tabConfig.find((tab) => tab.key === activeTab) || tabConfig[0];
+  const isApproved = Boolean(approvedTabs?.[activeTab]);
 
   const contentPanel = useMemo(() => {
     if (!hasCampaign) {
@@ -230,12 +242,6 @@ export default function ReviewView({ input, result, onExport, hasCampaign }) {
       <div className="review-page__header">
         <div className="review-page__eyebrow">REVIEWING: AMS_CAMPAIGN_Q4</div>
         <div className="review-page__actions">
-          <button type="button" className="review-page__icon-button" aria-label="Notifications">
-            <span className="material-symbols-outlined">notifications</span>
-          </button>
-          <button type="button" className="review-page__icon-button" aria-label="Energy">
-            <span className="material-symbols-outlined">bolt</span>
-          </button>
           <button type="button" className="review-page__export" onClick={onExport}>
             <span className="material-symbols-outlined">download</span>
             <span>Export Assets</span>
@@ -301,24 +307,27 @@ export default function ReviewView({ input, result, onExport, hasCampaign }) {
 
           <div className="review-content__body">{contentPanel}</div>
 
-          <div className="review-content__footer">
-            <div className="review-content__footer-tools">
-              <button type="button" className="review-content__tool">
-                <span className="material-symbols-outlined">edit</span>
-              </button>
-              <button type="button" className="review-content__tool">
-                <span className="material-symbols-outlined">history</span>
-              </button>
-            </div>
+          {error ? <div className="review-content__error">{error}</div> : null}
 
+          <div className="review-content__footer">
             <div className="review-content__footer-actions">
-              <button type="button" className="review-content__secondary">
+              <button
+                type="button"
+                className="review-content__secondary"
+                onClick={() => onRegenerateChannel(activeTab)}
+                disabled={!hasCampaign || actionLoading}
+              >
                 <span className="material-symbols-outlined">refresh</span>
-                <span>Regenerate {activeMeta.label}</span>
+                <span>{actionLoading ? "Regenerating..." : `Regenerate ${activeMeta.label}`}</span>
               </button>
-              <button type="button" className="review-content__primary">
+              <button
+                type="button"
+                className={`review-content__primary ${isApproved ? "is-approved" : ""}`}
+                onClick={() => onApproveChannel(activeTab)}
+                disabled={!hasCampaign || isApproved}
+              >
                 <span className="material-symbols-outlined">check_circle</span>
-                <span>Approve Content</span>
+                <span>{isApproved ? `${activeMeta.label} Approved` : "Approve Content"}</span>
               </button>
             </div>
           </div>
