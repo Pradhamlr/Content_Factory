@@ -5,10 +5,42 @@ import { writerAgent } from "../agents/writer.js";
 import { editorAgent } from "../agents/editor.js";
 import { addStream, publish, removeStream } from "../utils/requestEvents.js";
 import { delay } from "../utils/delay.js";
+import { mergeCampaignContent } from "../utils/contentShape.js";
 
 const router = Router();
 const MAX_RETRIES = 2;
 const UX_DELAY_MS = 900;
+const AGENT_RETRY_LIMIT = 2;
+
+function startTimer() {
+  return Date.now();
+}
+
+function endTimer(startedAt) {
+  return Date.now() - startedAt;
+}
+
+async function runWithRecovery(taskName, requestId, runner) {
+  let lastError;
+
+  for (let attempt = 1; attempt <= AGENT_RETRY_LIMIT; attempt += 1) {
+    try {
+      return await runner();
+    } catch (error) {
+      lastError = error;
+
+      publish(requestId, "attempt", {
+        requestId,
+        attempt,
+        message: `${taskName} hit a formatting issue. Recovering automatically (${attempt}/${AGENT_RETRY_LIMIT}).`
+      });
+
+      await delay(700);
+    }
+  }
+
+  throw lastError;
+}
 
 router.get("/stream", (req, res) => {
   const requestId = req.query.requestId;
@@ -39,6 +71,7 @@ router.post("/", async (req, res, next) => {
   try {
     const input = req.body?.input;
     const requestId = req.body?.requestId || crypto.randomUUID();
+    const requestStartedAt = startTimer();
 
     if (!input || typeof input !== "string" || !input.trim()) {
       return res.status(400).json({
@@ -53,7 +86,15 @@ router.post("/", async (req, res, next) => {
     });
     await delay(500);
 
-    const facts = await researcherAgent(input.trim(), { requestId });
+    const stageTimings = {
+      researcherMs: 0,
+      writerMs: 0,
+      editorMs: 0
+    };
+
+    const researcherStartedAt = startTimer();
+    const facts = await runWithRecovery("Researcher", requestId, () => researcherAgent(input.trim(), { requestId }));
+    stageTimings.researcherMs = endTimer(researcherStartedAt);
     await delay(UX_DELAY_MS);
 
     let attempts = 0;
@@ -70,12 +111,16 @@ router.post("/", async (req, res, next) => {
       });
       await delay(500);
 
-      const draft = await writerAgent(facts, feedback, { requestId });
+      const writerStartedAt = startTimer();
+      const draft = await runWithRecovery("Writer", requestId, () => writerAgent(facts, feedback, { requestId }));
+      stageTimings.writerMs += endTimer(writerStartedAt);
       await delay(UX_DELAY_MS);
-      const review = await editorAgent(draft, facts, { requestId });
+      const editorStartedAt = startTimer();
+      const review = await runWithRecovery("Editor", requestId, () => editorAgent(draft, facts, { requestId }));
+      stageTimings.editorMs += endTimer(editorStartedAt);
       await delay(UX_DELAY_MS);
 
-      finalContent = review.content || draft;
+      finalContent = review.status === "APPROVED" ? mergeCampaignContent(review.content, draft) : mergeCampaignContent(draft, {});
       finalReview = review;
 
       if (review.status === "APPROVED") {
@@ -99,7 +144,16 @@ router.post("/", async (req, res, next) => {
       content: finalContent,
       attempts,
       status: finalReview?.status || "REJECTED",
-      feedback: finalReview?.feedback || ""
+      feedback: finalReview?.feedback || "",
+      telemetry: {
+        requestStartedAt: new Date(requestStartedAt).toISOString(),
+        requestCompletedAt: new Date().toISOString(),
+        durationMs: endTimer(requestStartedAt),
+        stageTimings,
+        ambiguityCount: Array.isArray(facts?.ambiguities) ? facts.ambiguities.length : 0,
+        featureCount: Array.isArray(facts?.features) ? facts.features.length : 0,
+        audienceCount: Array.isArray(facts?.targetAudience) ? facts.targetAudience.length : 0
+      }
     });
   } catch (error) {
     next(error);

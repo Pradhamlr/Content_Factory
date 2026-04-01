@@ -42,6 +42,34 @@ body {
   selection-color: #006970;
 }
 
+html {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.38) transparent;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.36) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 0.42rem;
+  height: 0.42rem;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(173, 186, 203, 0.34), rgba(109, 123, 144, 0.46));
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, rgba(188, 201, 217, 0.5), rgba(120, 136, 157, 0.62));
+}
+
 button,
 input,
 textarea {
@@ -552,10 +580,12 @@ button {
 .war-room-stream__head h3,
 .war-room-panel__title {
   margin: 0;
+  margin-bottom: 5px;
   font-size: 0.6rem;
   font-weight: 800;
   letter-spacing: 0.14em;
   text-transform: uppercase;
+  line-height: 1.4;
 }
 .war-room-meter__track {
   flex: 1;
@@ -583,7 +613,7 @@ button {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  padding: 1.5rem;
+  padding: 1.5rem 1.5rem 1.35rem;
   overflow: hidden;
   background: var(--surface);
 }
@@ -609,7 +639,7 @@ button {
   grid-template-columns: 1fr 2rem 1fr 2rem 1fr;
   align-items: center;
   gap: 0;
-  margin-bottom: 2rem;
+  margin-bottom: 1.75rem;
 }
 
 .war-room-link {
@@ -629,8 +659,8 @@ button {
 }
 
 .war-agent-card {
-  min-height: 10.55rem;
-  padding: 1.5rem;
+  min-height: 11rem;
+  padding: 1.65rem 1.5rem 1.45rem;
   border: 1px solid rgba(59, 73, 75, 0.2);
   background: var(--surface-low);
   text-align: center;
@@ -660,9 +690,9 @@ button {
 
 .war-agent-card__icon {
   position: relative;
-  width: 5rem;
-  height: 5rem;
-  margin: 0 auto 1rem;
+  width: 5.25rem;
+  height: 5.25rem;
+  margin: 0 auto 1.1rem;
   border-radius: 999px;
   display: grid;
   place-items: center;
@@ -689,10 +719,10 @@ button {
 
 .war-agent-card__status-dot {
   position: absolute;
-  right: 0.55rem;
-  bottom: 0.55rem;
-  width: 0.78rem;
-  height: 0.78rem;
+  right: 0.62rem;
+  bottom: 0.62rem;
+  width: 0.84rem;
+  height: 0.84rem;
   border-radius: 999px;
   background: rgba(148, 163, 184, 0.1);
   border: 2px solid var(--surface-low);
@@ -751,8 +781,8 @@ button {
   margin: 0;
   color: var(--text);
   font-family: "Space Grotesk", sans-serif;
-  font-size: 0.96rem;
-  line-height: 1.15;
+  font-size: 0.98rem;
+  line-height: 1.18;
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -767,11 +797,11 @@ button {
 }
 
 .war-agent-card__status {
-  margin-top: 0.7rem;
+  margin-top: 0.78rem;
   color: rgba(148, 163, 184, 0.6);
-  font-size: 0.45rem;
+  font-size: 0.5rem;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
 }
 
@@ -789,15 +819,15 @@ button {
   flex: 1;
   min-height: 0;
   overflow: hidden;
-  border: 1px solid rgba(59, 73, 75, 0.1);
+  border: 1px solid rgba(59, 73, 75, 0.14);
   background: rgba(6, 14, 32, 0.5);
   box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.18);
 }
 
 .war-room-stream__head {
   justify-content: space-between;
-  min-height: 3rem;
-  padding: 0 1rem;
+  min-height: 3.1rem;
+  padding: 0 1.1rem;
   background: rgba(19, 27, 46, 0.3);
   border-bottom: 1px solid rgba(59, 73, 75, 0.1);
 }
@@ -829,16 +859,27 @@ button {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 1.5rem;
+  padding: 1.35rem 1.5rem;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.35) transparent;
+}
+
+.war-room-stream__body::-webkit-scrollbar {
+  width: 0.45rem;
+}
+
+.war-room-stream__body::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.32);
 }
 
 .war-room-log {
   display: flex;
   gap: 1rem;
-  padding: 0.6rem 0;
-  font-size: 0.72rem;
-  line-height: 1.7;
+  padding: 0.55rem 0;
+  font-size: 0.7rem;
+  line-height: 1.72;
 }
 
 .war-room-log--error,
@@ -864,7 +905,7 @@ button {
 }
 
 .war-room-log__message {
-  color: #b9cacb;
+  color: #c5d3d8;
 }
 
 .war-room-log__badge {
@@ -894,7 +935,7 @@ button {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  margin: 0.85rem 1rem 1rem;
+  margin: 0.7rem 1rem 1rem;
   padding: 0 0.85rem;
   height: 3rem;
   border: 1px solid rgba(59, 73, 75, 0.1);
@@ -937,6 +978,18 @@ button {
   width: 20rem;
   background: #0d1326;
   border-left: 1px solid rgba(59, 73, 75, 0.1);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.3) transparent;
+}
+
+.war-room-sidebar::-webkit-scrollbar {
+  width: 0.45rem;
+}
+
+.war-room-sidebar::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.28);
 }
 
 .war-room-panel {
@@ -946,11 +999,11 @@ button {
 }
 
 .war-room-panel:first-child {
-  padding: 1.25rem 0 0;
+  padding: 1.35rem 0 0;
 }
 
 .war-room-panel + .war-room-panel {
-  margin-top: 1.5rem;
+  margin-top: 1.35rem;
 }
 
 .war-room-panel__header {
@@ -982,7 +1035,7 @@ button {
   justify-content: space-between;
   margin-bottom: 0.85rem;
   color: rgba(148, 163, 184, 0.68);
-  font-size: 0.55rem;
+  font-size: 0.56rem;
   font-weight: 700;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -990,7 +1043,8 @@ button {
 
 .war-room-panel__label-row strong {
   color: var(--primary);
-  font-size: 0.62rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
 }
 
 .war-room-meter + .war-room-meter {
@@ -1001,12 +1055,16 @@ button {
   justify-content: space-between;
   margin-bottom: 0.35rem;
   color: rgba(148, 163, 184, 0.78);
-  font-size: 0.66rem;
+  font-size: 0.62rem;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  letter-spacing: 0.04em;
 }
 
 .war-room-meter__row strong {
   color: var(--primary);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .war-room-meter__track.is-green div {
@@ -1015,11 +1073,12 @@ button {
 
 .war-room-artifact {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 0.75rem;
-  padding: 0.9rem 0.85rem;
-  border-radius: 0.25rem;
-  background: rgba(19, 27, 46, 0.5);
+  padding: 0.95rem 1rem;
+  border-radius: 0.45rem;
+  background: rgba(19, 27, 46, 0.72);
+  border: 1px solid rgba(59, 73, 75, 0.12);
 }
 
 .war-room-empty,
@@ -1058,11 +1117,15 @@ button {
   color: var(--text);
   font-size: 0.7rem;
   font-weight: 700;
+  line-height: 1.35;
+  word-break: break-word;
 }
 
 .war-room-artifact small {
   color: rgba(148, 163, 184, 0.62);
-  font-size: 0.5rem;
+  display: block;
+  margin-top: 0.28rem;
+  font-size: 0.52rem;
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
@@ -1070,17 +1133,18 @@ button {
 .war-room-panel--accent {
   margin-top: 1.5rem;
   padding: 1rem;
-  border: 1px solid rgba(0, 240, 255, 0.2);
+  border: 1px solid rgba(0, 240, 255, 0.35);
   border-radius: 0.5rem;
-  background: rgba(0, 240, 255, 0.05);
+  background: rgba(0, 240, 255, 0.04);
 }
 
 .war-room-panel ul {
   margin: 0;
   padding-left: 1rem;
   color: rgba(148, 163, 184, 0.82);
-  font-size: 0.64rem;
+  font-size: 0.66rem;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  line-height: 1.7;
 }
 
 .war-room-panel li + li {
@@ -1092,6 +1156,7 @@ button {
   padding: 1.25rem;
   border-top: 1px solid rgba(59, 73, 75, 0.1);
   background: var(--surface-lowest);
+  flex-shrink: 0;
 }
 
 .war-room-footer-stats > div {
@@ -1114,7 +1179,7 @@ button {
 .war-room-footer-stats strong {
   display: block;
   margin-top: 0.35rem;
-  font-size: 0.82rem;
+  font-size: 0.78rem;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   color: var(--green-text);
 }
@@ -1210,8 +1275,8 @@ button {
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: 0.96fr 1.04fr;
-  gap: 1.25rem;
+  grid-template-columns: 0.93fr 1.07fr;
+  gap: 1rem;
 }
 
 .review-source,
@@ -1280,10 +1345,10 @@ button {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 1.75rem;
+  padding: 1.55rem 1.5rem;
   color: rgba(148, 163, 184, 0.84);
-  font-size: 0.9rem;
-  line-height: 1.85;
+  font-size: 0.88rem;
+  line-height: 1.8;
 }
 
 .review-source__body p {
@@ -1322,11 +1387,16 @@ button {
 
 .review-content__tabs {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  padding: 0 1rem;
+  gap: 1rem;
+  padding: 1rem 1.25rem 0.95rem;
   background: rgba(34, 42, 61, 0.3);
   border-bottom: 1px solid rgba(59, 73, 75, 0.15);
+}
+
+.review-content__tab-group {
+  min-width: 0;
 }
 
 .review-content__tab-list {
@@ -1351,10 +1421,19 @@ button {
   border-bottom-color: var(--primary);
 }
 
+.review-content__tab-summary {
+  margin: 0.45rem 0 0;
+  color: rgba(148, 163, 184, 0.72);
+  font-size: 0.68rem;
+  line-height: 1.5;
+  max-width: 28rem;
+}
+
 .review-content__score {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  padding-top: 0.1rem;
 }
 
 .review-content__score span {
@@ -1381,26 +1460,26 @@ button {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 2.25rem 2.1rem;
+  padding: 1.4rem 1.5rem 1.7rem;
 }
 
-.review-article {
-  max-width: 40rem;
+.review-format {
+  max-width: 39rem;
   margin: 0 auto;
 }
 
-.review-article__header {
-  margin-bottom: 2rem;
+.review-format__header {
+  margin-bottom: 1.5rem;
 }
 
-.review-article__meta {
+.review-format__meta {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  margin-bottom: 1rem;
+  margin-bottom: 0.85rem;
 }
 
-.review-article__chip {
+.review-format__chip {
   padding: 0.2rem 0.5rem;
   border-radius: 0.25rem;
   background: rgba(155, 240, 0, 0.12);
@@ -1412,57 +1491,242 @@ button {
   text-transform: uppercase;
 }
 
-.review-article__persona {
+.review-format__eyebrow {
   color: rgba(148, 163, 184, 0.62);
   font-size: 0.52rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 
-.review-article h1 {
+.review-format h1 {
   margin: 0;
   color: var(--text);
   font-family: "Space Grotesk", sans-serif;
-  font-size: 2rem;
-  line-height: 1.15;
+  font-size: 1.55rem;
+  line-height: 1.2;
   font-weight: 800;
   letter-spacing: -0.04em;
 }
 
-.review-article__media {
-  width: 100%;
-  aspect-ratio: 16 / 9;
-  margin-bottom: 2rem;
-  border-radius: 0.55rem;
-  border: 1px solid rgba(59, 73, 75, 0.12);
-  background:
-    radial-gradient(circle at 20% 20%, rgba(0, 240, 255, 0.2), transparent 30%),
-    linear-gradient(135deg, rgba(0, 240, 255, 0.15), rgba(6, 14, 32, 0.2)),
-    linear-gradient(180deg, #132035, #09111f);
-  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.28);
+.review-format__lead {
+  margin: 0.85rem 0 0;
+  color: #b7c7d8;
+  font-size: 0.95rem;
+  line-height: 1.75;
 }
 
-.review-article__prose {
+.review-format__prose {
   color: #b9cacb;
   font-size: 0.96rem;
-  line-height: 1.85;
+  line-height: 1.95;
+  max-width: 38rem;
 }
 
-.review-article__prose p {
+.review-format__prose p {
   margin: 0 0 1.5rem;
 }
 
-.review-article__prose p:first-child {
+.review-blog-shell {
+  margin-top: 0.2rem;
+}
+
+.review-blog-shell__label,
+.review-blog-panel__label {
+  margin-bottom: 0.7rem;
+  color: rgba(148, 163, 184, 0.58);
+  font-size: 0.52rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.review-blog-shell__title {
+  padding: 0.9rem 1rem;
+  border-radius: 0.3rem;
+  background: #06090f;
+  color: #f3f7ff;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 1.22rem;
+  line-height: 1.35;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.review-blog-panel {
+  border-radius: 0.4rem;
+  background: rgba(15, 20, 31, 0.92);
+  padding: 1.2rem 1.25rem;
+  border: 1px solid rgba(59, 73, 75, 0.1);
+}
+
+.review-blog-panel__content {
+  border-radius: 0.3rem;
+  background: rgba(5, 8, 14, 0.9);
+  padding: 1.2rem 1.15rem;
+}
+
+.review-blog-panel__content p {
+  margin: 0 0 1rem;
+  color: #c8d6e4;
+  font-size: 0.88rem;
+  line-height: 1.82;
+}
+
+.review-blog-panel__intro {
+  color: #e5efff;
+  font-size: 0.92rem;
+}
+
+.review-social-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.review-social-card {
+  padding: 1rem 1rem 0.9rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(59, 73, 75, 0.14);
+  background: linear-gradient(180deg, rgba(19, 27, 46, 0.95), rgba(12, 19, 34, 0.98));
+}
+
+.review-social-card__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.9rem;
+}
+
+.review-social-card__author {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.review-social-card__avatar {
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--primary), rgba(125, 244, 255, 0.55));
+  box-shadow: 0 0 0 3px rgba(0, 240, 255, 0.08);
+}
+
+.review-social-card__author strong {
+  display: block;
   color: var(--text);
-  font-size: 1.05rem;
-  font-weight: 600;
+  font-size: 0.8rem;
+  line-height: 1.3;
+}
+
+.review-social-card__author span {
+  display: block;
+  margin-top: 0.15rem;
+  color: rgba(148, 163, 184, 0.68);
+  font-size: 0.63rem;
+}
+
+.review-social-card__count {
+  color: var(--primary);
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.review-social-card p {
+  margin: 0;
+  color: #d7e2f2;
+  font-size: 0.95rem;
+  line-height: 1.8;
+}
+
+.review-social-card__actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 1rem;
+  color: rgba(148, 163, 184, 0.72);
+}
+
+.review-social-card__actions .material-symbols-outlined {
+  font-size: 1rem;
+}
+
+.review-email-card {
+  overflow: hidden;
+  border-radius: 0.85rem;
+  border: 1px solid rgba(59, 73, 75, 0.14);
+  background: linear-gradient(180deg, rgba(19, 27, 46, 0.96), rgba(10, 16, 28, 0.98));
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+}
+
+.review-email-card__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.15rem;
+  border-bottom: 1px solid rgba(59, 73, 75, 0.12);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.review-email-card__sender strong {
+  display: block;
+  color: var(--text);
+  font-size: 0.82rem;
+}
+
+.review-email-card__sender span {
+  display: block;
+  margin-top: 0.2rem;
+  color: rgba(148, 163, 184, 0.66);
+  font-size: 0.62rem;
+}
+
+.review-email-card__status {
+  padding: 0.3rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(0, 240, 255, 0.08);
+  color: var(--primary);
+  font-size: 0.54rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.review-email-card__body {
+  padding: 1.35rem 1.15rem 1rem;
+  color: #d6e0ef;
+  font-size: 0.88rem;
+  line-height: 1.8;
+}
+
+.review-email-card__body p {
+  margin: 0 0 1rem;
+}
+
+.review-email-card__cta {
+  padding: 0 1.15rem 1.25rem;
+}
+
+.review-email-card__cta button {
+  border: 0;
+  border-radius: 0.6rem;
+  height: 2.7rem;
+  padding: 0 1rem;
+  background: linear-gradient(90deg, #00dbe9, #7df4ff);
+  color: #00363a;
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 
 .review-content__footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 1rem 1.5rem;
+  padding: 0.9rem 1.25rem;
   background: rgba(19, 27, 46, 0.95);
   border-top: 1px solid rgba(59, 73, 75, 0.15);
 }
