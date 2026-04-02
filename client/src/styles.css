@@ -1976,12 +1976,12 @@ button {
 
 .browser-preview__body {
   background: #ffffff;
-  padding: 2rem;
-  min-height: 31rem;
+  padding: 1.8rem 1.8rem 1.4rem;
+  min-height: 25rem;
 }
 
 .browser-article {
-  max-width: 32rem;
+  max-width: 36rem;
   margin: 0 auto;
 }
 
@@ -1998,26 +1998,15 @@ button {
 }
 
 .browser-article h3 {
-  margin: 0 0 1.2rem;
+  margin: 0 0 1.25rem;
   color: #1e1b4b;
   font-family: "Space Grotesk", sans-serif;
-  font-size: 1.4rem;
-  line-height: 1.25;
+  font-size: 1.15rem;
+  line-height: 1.35;
   font-weight: 800;
   letter-spacing: -0.04em;
-  max-width: 38rem;
+  max-width: 28rem;
   overflow-wrap: anywhere;
-}
-
-.browser-article__image {
-  width: 100%;
-  height: 12rem;
-  margin-bottom: 1rem;
-  border-radius: 0.2rem;
-  background:
-    radial-gradient(circle at 30% 30%, rgba(0, 219, 233, 0.4), transparent 22%),
-    linear-gradient(180deg, rgba(9, 17, 31, 0.6), rgba(9, 17, 31, 0.95)),
-    linear-gradient(135deg, #0b1326, #09111f);
 }
 
 .browser-article p {
@@ -2027,40 +2016,23 @@ button {
   line-height: 1.7;
 }
 
-.browser-article__snapshot {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.75rem;
-  margin-bottom: 1rem;
-  padding: 1rem;
-  border-radius: 0.4rem;
-  background: #0b1326;
+.browser-article__hero-image {
+  overflow: hidden;
+  margin-bottom: 0.95rem;
+  border-radius: 0.2rem;
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.06);
 }
 
-.browser-article__snapshot span {
+.browser-article__hero-image img {
+  width: 100%;
+  height: 12.5rem;
   display: block;
-  margin-bottom: 0.35rem;
-  color: #94a3b8;
-  font-size: 0.52rem;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-.browser-article__snapshot strong {
-  color: #e2e8f0;
-  font-size: 0.84rem;
-  line-height: 1.45;
+  object-fit: cover;
 }
 
 .browser-article__content {
-  padding: 1rem;
-  border-radius: 0.35rem;
-  background: #0b1326;
-}
-
-.browser-article__content p + p {
-  margin-top: 0.9rem;
+  padding: 0;
+  background: transparent;
 }
 
 .phone-preview {
@@ -2165,28 +2137,26 @@ button {
 }
 
 .phone-preview__content-card {
-  display: grid;
-  gap: 0.7rem;
-  margin-top: 1rem;
-  padding: 1rem;
-  border-radius: 1rem;
-  background: rgba(8, 14, 28, 0.95);
-  border: 1px solid rgba(255, 255, 255, 0.04);
-}
-
-.phone-preview__content-metric span {
   display: block;
-  margin-bottom: 0.25rem;
-  color: #94a3b8;
-  font-size: 0.55rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  margin-top: 1rem;
+  padding: 0;
+  border-radius: 1rem;
+  background: transparent;
+  border: 0;
 }
 
-.phone-preview__content-metric strong {
-  color: #e2e8f0;
-  font-size: 0.78rem;
-  line-height: 1.4;
+.phone-preview__hero-image {
+  overflow: hidden;
+  border-radius: 0.85rem;
+  background: #081121;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+
+.phone-preview__hero-image img {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  display: block;
+  object-fit: cover;
 }
 
 .phone-preview__actions {

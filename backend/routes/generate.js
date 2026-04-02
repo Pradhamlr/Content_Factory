@@ -13,6 +13,7 @@ const UX_DELAY_MS = 900;
 const AGENT_RETRY_LIMIT = 2;
 const approvalStore = new Map();
 const deploymentStore = new Map();
+const resultStore = new Map();
 
 function startTimer() {
   return Date.now();
@@ -79,6 +80,146 @@ function getDeployment(requestId) {
   };
 }
 
+function getStoredResult(requestId) {
+  return resultStore.get(requestId) || null;
+}
+
+function getImageTitle(payload) {
+  const blog = payload?.content?.blog || "";
+  const firstLine = blog
+    .replace(/^#+\s*/gm, "")
+    .split("\n")
+    .map((line) => line.trim())
+    .find(Boolean);
+
+  return firstLine || payload?.facts?.valueProposition || "Campaign Preview";
+}
+
+function buildImagePrompt(payload, variant = "desktop") {
+  const facts = payload?.facts || {};
+  const title = getImageTitle(payload);
+  const value = facts.valueProposition || "";
+  const features = Array.isArray(facts.features) ? facts.features.slice(0, 3).join(", ") : "";
+  const audience = Array.isArray(facts.targetAudience) ? facts.targetAudience.slice(0, 2).join(", ") : "";
+  const style =
+    variant === "mobile"
+      ? "premium social media visual, editorial, modern, high contrast, topic relevant, no text overlay"
+      : "premium website hero image, editorial product storytelling, cinematic lighting, topic relevant, no text overlay";
+
+  return [title, value, features, audience, style].filter(Boolean).join(", ");
+}
+
+function escapeSvgText(value) {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
+function wrapSvgText(value, maxLength = 30) {
+  const words = String(value || "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+
+  if (!words.length) {
+    return ["Campaign Preview"];
+  }
+
+  const lines = [];
+  let current = "";
+
+  for (const word of words) {
+    const candidate = current ? `${current} ${word}` : word;
+
+    if (candidate.length > maxLength && current) {
+      lines.push(current);
+      current = word;
+    } else {
+      current = candidate;
+    }
+  }
+
+  if (current) {
+    lines.push(current);
+  }
+
+  return lines.slice(0, 3);
+}
+
+function buildFallbackSvg(title, variant = "desktop") {
+  const titleLines = wrapSvgText(title, variant === "mobile" ? 22 : 30).map(escapeSvgText);
+  const safeVariant = escapeSvgText(variant === "mobile" ? "SOCIAL VISUAL" : "BLOG HERO");
+  const subtitle = escapeSvgText("Topic-aware branded fallback rendered locally.");
+  const titleY = variant === "mobile" ? 350 : 320;
+  const titleSize = variant === "mobile" ? 58 : 64;
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="900" viewBox="0 0 1400 900">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#081121"/>
+      <stop offset="100%" stop-color="#0f1b34"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="35%" cy="30%" r="40%">
+      <stop offset="0%" stop-color="#00f0ff" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#00f0ff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="card" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#111a2e" stop-opacity="0.95"/>
+      <stop offset="100%" stop-color="#091120" stop-opacity="0.98"/>
+    </linearGradient>
+  </defs>
+  <rect width="1400" height="900" fill="url(#bg)"/>
+  <rect x="72" y="72" width="1256" height="756" rx="28" fill="#ffffff" fill-opacity="0.02" stroke="#ffffff" stroke-opacity="0.08"/>
+  <circle cx="500" cy="310" r="240" fill="url(#glow)"/>
+  <rect x="160" y="178" width="240" height="44" rx="12" fill="#4f46e5"/>
+  <text x="190" y="206" fill="#ffffff" font-family="Arial, sans-serif" font-size="24" font-weight="700">${safeVariant}</text>
+  <g fill="#eff6ff" font-family="Arial, sans-serif" font-size="${titleSize}" font-weight="700">
+    ${titleLines.map((line, index) => `<text x="160" y="${titleY + index * 78}">${line}</text>`).join("")}
+  </g>
+  <text x="160" y="${titleY + titleLines.length * 78 + 28}" fill="#94a3b8" font-family="Arial, sans-serif" font-size="32">${subtitle}</text>
+  <rect x="160" y="560" width="920" height="180" rx="24" fill="url(#card)" stroke="#ffffff" stroke-opacity="0.06"/>
+  <text x="210" y="626" fill="#94a3b8" font-family="Arial, sans-serif" font-size="24" font-weight="700">PREVIEW STATUS</text>
+  <text x="210" y="682" fill="#eff6ff" font-family="Arial, sans-serif" font-size="42" font-weight="700">AI image provider unavailable right now</text>
+  <text x="210" y="726" fill="#94a3b8" font-family="Arial, sans-serif" font-size="26">The app is still rendering a topic-driven fallback visual so the preview never appears broken.</text>
+</svg>`;
+}
+
+async function fetchPreviewImage(payload, variant) {
+  const prompt = buildImagePrompt(payload, variant);
+  const seed = `${payload?.requestId || "campaign"}-${variant}`;
+  const width = variant === "mobile" ? 1024 : 1400;
+  const height = variant === "mobile" ? 1400 : 900;
+  const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=${width}&height=${height}&seed=${encodeURIComponent(seed)}&nologo=true`;
+  let response = null;
+  let lastStatus = null;
+
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    response = await fetch(url, {
+      signal: AbortSignal.timeout(20000)
+    });
+
+    if (response.ok) {
+      break;
+    }
+
+    lastStatus = response.status;
+    await delay(500);
+  }
+
+  if (!response?.ok) {
+    throw new Error(`Image service responded with ${lastStatus || "an error"}`);
+  }
+
+  const buffer = Buffer.from(await response.arrayBuffer());
+  const contentType = response.headers.get("content-type") || "image/jpeg";
+
+  return { buffer, contentType };
+}
+
 router.get("/stream", (req, res) => {
   const requestId = req.query.requestId;
 
@@ -102,6 +243,38 @@ router.get("/stream", (req, res) => {
   req.on("close", () => {
     removeStream(requestId, res);
   });
+});
+
+router.get("/preview-image", async (req, res) => {
+  const requestId = req.query.requestId;
+  const variant = req.query.variant === "mobile" ? "mobile" : "desktop";
+
+  if (!requestId || typeof requestId !== "string") {
+    res.status(400).json({ error: "requestId query parameter is required." });
+    return;
+  }
+
+  const payload = getStoredResult(requestId);
+  const title = getImageTitle(payload);
+
+  if (!payload) {
+    res.setHeader("Content-Type", "image/svg+xml; charset=utf-8");
+    res.setHeader("Cache-Control", "no-store");
+    res.send(buildFallbackSvg("Campaign Preview", variant));
+    return;
+  }
+
+  try {
+    const { buffer, contentType } = await fetchPreviewImage(payload, variant);
+    res.setHeader("Content-Type", contentType);
+    res.setHeader("Cache-Control", "private, max-age=3600");
+    res.send(buffer);
+  } catch (error) {
+    console.error(`Preview image fallback used for ${requestId}/${variant}:`, error.message);
+    res.setHeader("Content-Type", "image/svg+xml; charset=utf-8");
+    res.setHeader("Cache-Control", "no-store");
+    res.send(buildFallbackSvg(title, variant));
+  }
 });
 
 router.post("/", async (req, res, next) => {
@@ -175,7 +348,7 @@ router.post("/", async (req, res, next) => {
       message: "Campaign generation finished."
     });
 
-    res.json({
+    const payload = {
       requestId,
       facts,
       content: finalContent,
@@ -193,7 +366,10 @@ router.post("/", async (req, res, next) => {
         featureCount: Array.isArray(facts?.features) ? facts.features.length : 0,
         audienceCount: Array.isArray(facts?.targetAudience) ? facts.targetAudience.length : 0
       }
-    });
+    };
+
+    resultStore.set(requestId, payload);
+    res.json(payload);
   } catch (error) {
     next(error);
   }
@@ -231,8 +407,7 @@ router.post("/regenerate", async (req, res, next) => {
 
     const reviewedContent = review.status === "APPROVED" ? mergeCampaignContent(review.content, draft) : mergeCampaignContent(draft, {});
     const content = replaceChannelContent(currentContent, reviewedContent, channel);
-
-    res.json({
+    const payload = {
       requestId,
       channel,
       content,
@@ -241,7 +416,22 @@ router.post("/regenerate", async (req, res, next) => {
       approved: review.status === "APPROVED",
       approvals: getApprovals(requestId),
       deployment: getDeployment(requestId)
-    });
+    };
+
+    const existing = getStoredResult(requestId);
+
+    if (existing) {
+      resultStore.set(requestId, {
+        ...existing,
+        content,
+        status: review.status,
+        feedback: review.feedback || "",
+        approvals: payload.approvals,
+        deployment: payload.deployment
+      });
+    }
+
+    res.json(payload);
   } catch (error) {
     next(error);
   }
@@ -265,6 +455,15 @@ router.post("/approve", (req, res) => {
   };
 
   approvalStore.set(requestId, approvals);
+
+  const existing = getStoredResult(requestId);
+
+  if (existing) {
+    resultStore.set(requestId, {
+      ...existing,
+      approvals
+    });
+  }
 
   res.json({
     requestId,
@@ -295,6 +494,15 @@ router.post("/deploy", (req, res) => {
   };
 
   deploymentStore.set(requestId, deployment);
+
+  const existing = getStoredResult(requestId);
+
+  if (existing) {
+    resultStore.set(requestId, {
+      ...existing,
+      deployment
+    });
+  }
 
   res.json({
     requestId,

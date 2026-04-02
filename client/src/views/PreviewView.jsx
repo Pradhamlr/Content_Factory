@@ -26,6 +26,31 @@ function getBlogParagraphs(blog) {
     .slice(0, 3);
 }
 
+function getBlogExcerpt(blog) {
+  if (!blog) {
+    return "";
+  }
+
+  const clean = blog
+    .replace(/^#+\s*/gm, "")
+    .replace(/\*\*/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const sentences = clean.match(/[^.!?]+[.!?]+/g) || [];
+
+  if (sentences.length) {
+    const excerpt = sentences
+      .slice(0, 3)
+      .map((sentence) => sentence.trim())
+      .join(" ");
+
+    return sentences.length > 3 ? `${excerpt} ...` : excerpt;
+  }
+
+  return clean.length > 260 ? `${clean.slice(0, 257).trim()} ...` : clean;
+}
+
 function getEmailHeadline(email) {
   if (!email) {
     return "";
@@ -33,6 +58,66 @@ function getEmailHeadline(email) {
 
   const clean = email.replace(/^subject:\s*/im, "").trim();
   return clean.split(/[.!?]/)[0]?.trim() || clean.slice(0, 90);
+}
+
+function hashString(value) {
+  let hash = 0;
+
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash << 5) - hash + value.charCodeAt(index);
+    hash |= 0;
+  }
+
+  return Math.abs(hash);
+}
+
+function buildTopicVisualDataUrl(seedSource, variant = "desktop") {
+  const seed = hashString(seedSource || "campaign-preview");
+  const width = variant === "mobile" ? 1080 : 1400;
+  const height = variant === "mobile" ? 1080 : 760;
+  const amplitudeA = 70 + (seed % 70);
+  const amplitudeB = 50 + ((seed >> 3) % 60);
+  const offsetA = 180 + ((seed >> 2) % 120);
+  const offsetB = 380 + ((seed >> 4) % 140);
+  const hueShift = seed % 25;
+  const label = variant === "mobile" ? "SOCIAL VISUAL" : "FEATURE TECH";
+
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+      <defs>
+        <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="#081121"/>
+          <stop offset="100%" stop-color="#0d172b"/>
+        </linearGradient>
+        <radialGradient id="glow" cx="50%" cy="45%" r="45%">
+          <stop offset="0%" stop-color="rgba(0,240,255,0.42)"/>
+          <stop offset="45%" stop-color="rgba(0,240,255,0.12)"/>
+          <stop offset="100%" stop-color="rgba(0,240,255,0)"/>
+        </radialGradient>
+      </defs>
+      <rect width="${width}" height="${height}" rx="24" fill="url(#bg)"/>
+      <rect x="1" y="1" width="${width - 2}" height="${height - 2}" rx="24" fill="none" stroke="rgba(255,255,255,0.05)"/>
+      <ellipse cx="${Math.round(width * 0.48)}" cy="${Math.round(height * 0.44)}" rx="${Math.round(width * 0.18)}" ry="${Math.round(height * 0.25)}" fill="url(#glow)"/>
+      <g fill="none" stroke="rgba(56,228,255,0.72)" stroke-width="3">
+        <path d="M 40 ${offsetA} C ${Math.round(width * 0.18)} ${offsetA - amplitudeA}, ${Math.round(width * 0.36)} ${offsetA + amplitudeA}, ${Math.round(width * 0.52)} ${offsetA}
+                 S ${Math.round(width * 0.84)} ${offsetA - amplitudeA}, ${width - 40} ${offsetA}" />
+        <path d="M 40 ${offsetA + 22} C ${Math.round(width * 0.18)} ${offsetA + 22 - amplitudeA * 0.85}, ${Math.round(width * 0.36)} ${offsetA + 22 + amplitudeA * 0.9}, ${Math.round(width * 0.52)} ${offsetA + 22}
+                 S ${Math.round(width * 0.84)} ${offsetA + 22 - amplitudeA * 0.8}, ${width - 40} ${offsetA + 22}" opacity="0.8" />
+        <path d="M 40 ${offsetB} C ${Math.round(width * 0.2)} ${offsetB + amplitudeB}, ${Math.round(width * 0.38)} ${offsetB - amplitudeB}, ${Math.round(width * 0.56)} ${offsetB}
+                 S ${Math.round(width * 0.84)} ${offsetB + amplitudeB}, ${width - 40} ${offsetB}" opacity="0.65" />
+        <path d="M 40 ${offsetB + 18} C ${Math.round(width * 0.2)} ${offsetB + 18 + amplitudeB * 0.8}, ${Math.round(width * 0.38)} ${offsetB + 18 - amplitudeB * 0.85}, ${Math.round(width * 0.56)} ${offsetB + 18}
+                 S ${Math.round(width * 0.84)} ${offsetB + 18 + amplitudeB * 0.8}, ${width - 40} ${offsetB + 18}" opacity="0.45" />
+      </g>
+      <g fill="none" stroke="rgba(99,102,241,${0.26 + hueShift / 100})" stroke-width="1.5">
+        <path d="M 60 ${Math.round(height * 0.2)} L ${width - 60} ${Math.round(height * 0.2)}"/>
+        <path d="M 60 ${Math.round(height * 0.8)} L ${width - 60} ${Math.round(height * 0.8)}"/>
+      </g>
+      <rect x="44" y="44" width="170" height="42" rx="11" fill="#4f46e5"/>
+      <text x="69" y="71" fill="#ffffff" font-family="Arial, sans-serif" font-size="20" font-weight="700">${label}</text>
+    </svg>
+  `;
+
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
 }
 
 function formatDeployLabel(deployment) {
@@ -67,6 +152,10 @@ export default function PreviewView({
   const visualSync = hasCampaign ? `${approvedCount}/3 channels approved` : "No review data yet";
   const deployLabel = formatDeployLabel(deployment);
   const deploymentTime = deployment?.deployedAt ? new Date(deployment.deployedAt).toLocaleString() : "Not deployed";
+  const visualSeed = `${blogTitle}|${firstTweet}|${email}|${result?.facts?.valueProposition || ""}`;
+  const desktopImageUrl = hasCampaign ? buildTopicVisualDataUrl(visualSeed, "desktop") : "";
+  const mobileImageUrl = hasCampaign ? buildTopicVisualDataUrl(visualSeed, "mobile") : "";
+  const blogExcerpt = getBlogExcerpt(blog);
 
   return (
     <section className="preview-page">
@@ -115,24 +204,15 @@ export default function PreviewView({
                 {hasCampaign ? <span className="browser-article__tag">Campaign Story</span> : null}
                 <h3>{hasCampaign ? blogTitle || "Desktop preview will appear after generation" : "Desktop preview will appear after generation"}</h3>
 
-                <div className="browser-article__snapshot">
-                  <div>
-                    <span>Approved</span>
-                    <strong>{approvedTabs?.blog ? "Blog approved" : "Review pending"}</strong>
+                {desktopImageUrl ? (
+                  <div className="browser-article__hero-image">
+                    <img src={desktopImageUrl} alt="Topic-based campaign hero visual" loading="lazy" />
                   </div>
-                  <div>
-                    <span>Thread ready</span>
-                    <strong>{tweets.length ? `${tweets.length} social posts` : "No thread yet"}</strong>
-                  </div>
-                  <div>
-                    <span>Email status</span>
-                    <strong>{email ? "Teaser available" : "No teaser yet"}</strong>
-                  </div>
-                </div>
+                ) : null}
 
                 <div className="browser-article__content">
-                  {hasCampaign && blogParagraphs.length ? (
-                    blogParagraphs.map((paragraph, index) => <p key={`${index}-${paragraph.slice(0, 20)}`}>{paragraph}</p>)
+                  {hasCampaign && blogExcerpt ? (
+                    <p>{blogExcerpt}</p>
                   ) : (
                     <p>Generated blog content is rendered here once the campaign has been started and approved.</p>
                   )}
@@ -176,18 +256,11 @@ export default function PreviewView({
                 </div>
 
                 <div className="phone-preview__content-card">
-                  <div className="phone-preview__content-metric">
-                    <span>Thread length</span>
-                    <strong>{tweets.length || 0} posts</strong>
-                  </div>
-                  <div className="phone-preview__content-metric">
-                    <span>Email teaser</span>
-                    <strong>{email ? "Ready" : "Missing"}</strong>
-                  </div>
-                  <div className="phone-preview__content-metric">
-                    <span>Deployment</span>
-                    <strong>{deployment?.deployed ? "Live" : "Pending"}</strong>
-                  </div>
+                  {mobileImageUrl ? (
+                    <div className="phone-preview__hero-image">
+                      <img src={mobileImageUrl} alt="Topic-based social campaign visual" loading="lazy" />
+                    </div>
+                  ) : null}
                 </div>
 
                 <div className="phone-preview__actions">
