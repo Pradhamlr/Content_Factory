@@ -13,6 +13,22 @@ export async function api(path, options = {}) {
   return payload;
 }
 
+export async function apiForm(path, formData, options = {}) {
+  const response = await fetch(path, {
+    method: "POST",
+    body: formData,
+    ...options
+  });
+
+  const payload = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    throw new Error(payload?.error || "Request failed.");
+  }
+
+  return payload;
+}
+
 export function buildExportFile(name, payload, type = "application/json") {
   const blob = new Blob([type === "application/json" ? JSON.stringify(payload, null, 2) : payload], { type });
   const url = window.URL.createObjectURL(blob);

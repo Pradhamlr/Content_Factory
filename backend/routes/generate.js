@@ -1,16 +1,24 @@
 import { Router } from "express";
 import crypto from "crypto";
+import multer from "multer";
 import { researcherAgent } from "../agents/researcher.js";
 import { writerAgent } from "../agents/writer.js";
 import { editorAgent } from "../agents/editor.js";
 import { addStream, publish, removeStream } from "../utils/requestEvents.js";
 import { delay } from "../utils/delay.js";
 import { mergeCampaignContent, normalizeCampaignContent } from "../utils/contentShape.js";
+import { extractPdfText } from "../utils/pdfExtractor.js";
 
 const router = Router();
 const MAX_RETRIES = 2;
 const UX_DELAY_MS = 900;
 const AGENT_RETRY_LIMIT = 2;
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 10 * 1024 * 1024
+  }
+});
 const approvalStore = new Map();
 const deploymentStore = new Map();
 const resultStore = new Map();
@@ -220,6 +228,93 @@ async function fetchPreviewImage(payload, variant) {
   return { buffer, contentType };
 }
 
+async function runCampaignPipeline(input, requestId) {
+  const requestStartedAt = startTimer();
+
+  publish(requestId, "lifecycle", {
+    requestId,
+    status: "started",
+    message: "Campaign generation started."
+  });
+  await delay(500);
+
+  const stageTimings = {
+    researcherMs: 0,
+    writerMs: 0,
+    editorMs: 0
+  };
+
+  const researcherStartedAt = startTimer();
+  const facts = await runWithRecovery("Researcher", requestId, () => researcherAgent(input.trim(), { requestId }));
+  stageTimings.researcherMs = endTimer(researcherStartedAt);
+  await delay(UX_DELAY_MS);
+
+  let attempts = 0;
+  let feedback = "";
+  let finalContent = null;
+  let finalReview = null;
+
+  while (attempts <= MAX_RETRIES) {
+    attempts += 1;
+    publish(requestId, "attempt", {
+      requestId,
+      attempt: attempts,
+      message: `Writer attempt ${attempts} started.`
+    });
+    await delay(500);
+
+    const writerStartedAt = startTimer();
+    const draft = await runWithRecovery("Writer", requestId, () => writerAgent(facts, feedback, { requestId }));
+    stageTimings.writerMs += endTimer(writerStartedAt);
+    await delay(UX_DELAY_MS);
+
+    const editorStartedAt = startTimer();
+    const review = await runWithRecovery("Editor", requestId, () => editorAgent(draft, facts, { requestId }));
+    stageTimings.editorMs += endTimer(editorStartedAt);
+    await delay(UX_DELAY_MS);
+
+    finalContent = review.status === "APPROVED" ? mergeCampaignContent(review.content, draft) : mergeCampaignContent(draft, {});
+    finalReview = review;
+
+    if (review.status === "APPROVED") {
+      break;
+    }
+
+    feedback = review.feedback || "Please improve clarity and align strictly with the facts.";
+    await delay(700);
+  }
+
+  publish(requestId, "complete", {
+    requestId,
+    status: finalReview?.status || "REJECTED",
+    attempts,
+    message: "Campaign generation finished."
+  });
+
+  const payload = {
+    requestId,
+    facts,
+    content: finalContent,
+    attempts,
+    status: finalReview?.status || "REJECTED",
+    feedback: finalReview?.feedback || "",
+    approvals: getApprovals(requestId),
+    deployment: getDeployment(requestId),
+    telemetry: {
+      requestStartedAt: new Date(requestStartedAt).toISOString(),
+      requestCompletedAt: new Date().toISOString(),
+      durationMs: endTimer(requestStartedAt),
+      stageTimings,
+      ambiguityCount: Array.isArray(facts?.ambiguities) ? facts.ambiguities.length : 0,
+      featureCount: Array.isArray(facts?.features) ? facts.features.length : 0,
+      audienceCount: Array.isArray(facts?.targetAudience) ? facts.targetAudience.length : 0
+    }
+  };
+
+  resultStore.set(requestId, payload);
+  return payload;
+}
+
 router.get("/stream", (req, res) => {
   const requestId = req.query.requestId;
 
@@ -281,7 +376,6 @@ router.post("/", async (req, res, next) => {
   try {
     const input = req.body?.input;
     const requestId = req.body?.requestId || crypto.randomUUID();
-    const requestStartedAt = startTimer();
 
     if (!input || typeof input !== "string" || !input.trim()) {
       return res.status(400).json({
@@ -289,87 +383,91 @@ router.post("/", async (req, res, next) => {
       });
     }
 
+    const payload = await runCampaignPipeline(input, requestId);
+    res.json(payload);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/upload", upload.single("file"), async (req, res, next) => {
+  try {
+    const requestId = req.body?.requestId || crypto.randomUUID();
+    const file = req.file;
+
+    if (!file) {
+      return res.status(400).json({ error: "Please upload a PDF file." });
+    }
+
+    const isPdfMime = file.mimetype === "application/pdf";
+    const isPdfName = file.originalname?.toLowerCase().endsWith(".pdf");
+
+    if (!isPdfMime && !isPdfName) {
+      return res.status(400).json({ error: "Only PDF uploads are supported right now." });
+    }
+
     publish(requestId, "lifecycle", {
       requestId,
       status: "started",
-      message: "Campaign generation started."
+      message: `PDF upload received: ${file.originalname}`
     });
-    await delay(500);
 
-    const stageTimings = {
-      researcherMs: 0,
-      writerMs: 0,
-      editorMs: 0
-    };
+    const extractedText = await extractPdfText(file.buffer);
 
-    const researcherStartedAt = startTimer();
-    const facts = await runWithRecovery("Researcher", requestId, () => researcherAgent(input.trim(), { requestId }));
-    stageTimings.researcherMs = endTimer(researcherStartedAt);
-    await delay(UX_DELAY_MS);
-
-    let attempts = 0;
-    let feedback = "";
-    let finalContent = null;
-    let finalReview = null;
-
-    while (attempts <= MAX_RETRIES) {
-      attempts += 1;
-      publish(requestId, "attempt", {
-        requestId,
-        attempt: attempts,
-        message: `Writer attempt ${attempts} started.`
-      });
-      await delay(500);
-
-      const writerStartedAt = startTimer();
-      const draft = await runWithRecovery("Writer", requestId, () => writerAgent(facts, feedback, { requestId }));
-      stageTimings.writerMs += endTimer(writerStartedAt);
-      await delay(UX_DELAY_MS);
-      const editorStartedAt = startTimer();
-      const review = await runWithRecovery("Editor", requestId, () => editorAgent(draft, facts, { requestId }));
-      stageTimings.editorMs += endTimer(editorStartedAt);
-      await delay(UX_DELAY_MS);
-
-      finalContent = review.status === "APPROVED" ? mergeCampaignContent(review.content, draft) : mergeCampaignContent(draft, {});
-      finalReview = review;
-
-      if (review.status === "APPROVED") {
-        break;
-      }
-
-      feedback = review.feedback || "Please improve clarity and align strictly with the facts.";
-      await delay(700);
+    if (!extractedText.trim()) {
+      return res.status(400).json({ error: "No extractable text was found in this PDF." });
     }
 
-    publish(requestId, "complete", {
+    publish(requestId, "lifecycle", {
       requestId,
-      status: finalReview?.status || "REJECTED",
-      attempts,
-      message: "Campaign generation finished."
+      status: "processing",
+      message: "PDF text extracted successfully. Starting campaign generation."
     });
 
-    const payload = {
-      requestId,
-      facts,
-      content: finalContent,
-      attempts,
-      status: finalReview?.status || "REJECTED",
-      feedback: finalReview?.feedback || "",
-      approvals: getApprovals(requestId),
-      deployment: getDeployment(requestId),
-      telemetry: {
-        requestStartedAt: new Date(requestStartedAt).toISOString(),
-        requestCompletedAt: new Date().toISOString(),
-        durationMs: endTimer(requestStartedAt),
-        stageTimings,
-        ambiguityCount: Array.isArray(facts?.ambiguities) ? facts.ambiguities.length : 0,
-        featureCount: Array.isArray(facts?.features) ? facts.features.length : 0,
-        audienceCount: Array.isArray(facts?.targetAudience) ? facts.targetAudience.length : 0
-      }
-    };
+    const payload = await runCampaignPipeline(extractedText, requestId);
+    res.json({
+      ...payload,
+      uploadedFile: {
+        name: file.originalname,
+        size: file.size,
+        mimeType: file.mimetype
+      },
+      extractedText
+    });
+  } catch (error) {
+    next(error);
+  }
+});
 
-    resultStore.set(requestId, payload);
-    res.json(payload);
+router.post("/extract-pdf", upload.single("file"), async (req, res, next) => {
+  try {
+    const file = req.file;
+
+    if (!file) {
+      return res.status(400).json({ error: "Please upload a PDF file." });
+    }
+
+    const isPdfMime = file.mimetype === "application/pdf";
+    const isPdfName = file.originalname?.toLowerCase().endsWith(".pdf");
+
+    if (!isPdfMime && !isPdfName) {
+      return res.status(400).json({ error: "Only PDF uploads are supported right now." });
+    }
+
+    const extractedText = await extractPdfText(file.buffer);
+
+    if (!extractedText.trim()) {
+      return res.status(400).json({ error: "No extractable text was found in this PDF." });
+    }
+
+    res.json({
+      extractedText,
+      uploadedFile: {
+        name: file.originalname,
+        size: file.size,
+        mimeType: file.mimetype
+      }
+    });
   } catch (error) {
     next(error);
   }

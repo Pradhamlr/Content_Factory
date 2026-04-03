@@ -26,11 +26,14 @@ Reject if:
 - value proposition is weak
 - facts are not used properly
 - tone is boring or repetitive
+- content contains placeholders like [Name], [CTA], [Company], or bracketed template text
+- content invents unsupported metrics, percentages, ROI, pricing, customer results, or case-study outcomes not present in the facts
 
 Approve ONLY if:
 - content is specific
 - clearly uses facts
 - compelling and structured
+- email content is immediately usable and not templated
 
 Return STRICT JSON:
 

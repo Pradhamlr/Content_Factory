@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import AppSidebar from "./components/AppSidebar";
 import AppTopbar from "./components/AppTopbar";
-import { api, buildCampaignKitFile, buildExportFile } from "./lib/api";
+import { api, apiForm, buildCampaignKitFile, buildExportFile } from "./lib/api";
 import CampaignsView from "./views/CampaignsView";
 import AgentsView from "./views/AgentsView";
 import PlaceholderView from "./views/PlaceholderView";
@@ -17,6 +17,8 @@ const initialAgentStages = {
 export default function App() {
   const [activeView, setActiveView] = useState("campaigns");
   const [input, setInput] = useState("");
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [extractingPdf, setExtractingPdf] = useState(false);
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -106,8 +108,8 @@ export default function App() {
   }
 
   async function handleGenerate() {
-    if (!input.trim()) {
-      setError("Please paste source material before generating content.");
+    if (!input.trim() && !selectedFile) {
+      setError("Please paste source material or upload a PDF before generating content.");
       return;
     }
 
@@ -119,10 +121,20 @@ export default function App() {
     setActiveView("agents");
 
     try {
-      const payload = await api("/api/generate", {
-        method: "POST",
-        body: JSON.stringify({ input: input.trim(), requestId: nextRequestId })
-      });
+      let payload;
+
+      if (selectedFile) {
+        const formData = new FormData();
+        formData.append("file", selectedFile);
+        formData.append("requestId", nextRequestId);
+        payload = await apiForm("/api/generate/upload", formData);
+        setInput(payload.extractedText || input);
+      } else {
+        payload = await api("/api/generate", {
+          method: "POST",
+          body: JSON.stringify({ input: input.trim(), requestId: nextRequestId })
+        });
+      }
 
       setResult(payload);
       setRequestId(payload.requestId || nextRequestId);
@@ -142,6 +154,30 @@ export default function App() {
       appendLog(nextError.message, "error");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handlePdfSelect(file) {
+    setSelectedFile(file);
+
+    if (!file) {
+      return;
+    }
+
+    setExtractingPdf(true);
+    setError("");
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const payload = await apiForm("/api/generate/extract-pdf", formData);
+      setInput(payload.extractedText || "");
+    } catch (nextError) {
+      setSelectedFile(null);
+      setInput("");
+      setError(nextError.message);
+    } finally {
+      setExtractingPdf(false);
     }
   }
 
@@ -273,8 +309,10 @@ export default function App() {
             <CampaignsView
               input={input}
               setInput={setInput}
+              selectedFile={selectedFile}
+              setSelectedFile={handlePdfSelect}
               onGenerate={handleGenerate}
-              loading={loading}
+              loading={loading || extractingPdf}
               error={error}
               result={result}
             />

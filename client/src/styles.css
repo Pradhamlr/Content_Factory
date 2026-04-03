@@ -516,6 +516,37 @@ button {
   font-size: 0.9rem;
 }
 
+.campaign-uploader__chip-button {
+  padding: 0.45rem 0.72rem;
+  border-radius: 0.38rem;
+  background: var(--surface-low);
+  color: rgba(148, 163, 184, 0.82);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: border-color 180ms ease, color 180ms ease, background 180ms ease;
+}
+
+.campaign-uploader__chip-button:hover {
+  color: var(--text);
+  border-color: rgba(0, 240, 255, 0.18);
+}
+
+.campaign-uploader__chip-button.is-active {
+  color: var(--primary);
+  border-color: rgba(0, 240, 255, 0.28);
+  background: rgba(0, 240, 255, 0.08);
+}
+
+.campaign-uploader__chip-button input {
+  display: none;
+}
+
 .campaign-uploader textarea {
   width: 100%;
   min-height: 14rem;
@@ -527,6 +558,14 @@ button {
   background: rgba(6, 14, 32, 0.9);
   color: var(--text);
   font-size: 0.9rem;
+}
+
+.campaign-uploader__file-name {
+  margin-bottom: 0.9rem;
+  color: rgba(148, 163, 184, 0.84);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
 }
 
 .campaign-uploader__actions {
@@ -2005,6 +2044,10 @@ button {
   line-height: 1.5;
 }
 
+.review-content__error strong {
+  color: #ffd1cb;
+}
+
 .review-content__note {
   margin: 0 1.25rem 0.8rem;
   padding: 0.8rem 0.9rem;
@@ -2021,6 +2064,35 @@ button {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  flex-wrap: nowrap;
+}
+
+.review-content__success-pill {
+  height: 2.2rem;
+  margin-right: 0.5rem;
+  padding: 0 0.85rem;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: rgba(0, 240, 255, 0.08);
+  border: 1px solid rgba(0, 240, 255, 0.14);
+  color: var(--primary);
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.review-content__success-pill .material-symbols-outlined {
+  font-size: 0.95rem;
+}
+
+.review-content__success-pill.is-rejected {
+  background: rgba(255, 180, 171, 0.08);
+  border-color: rgba(255, 180, 171, 0.16);
+  color: #ffcdc7;
 }
 
 .review-content__tool {
@@ -2048,6 +2120,8 @@ button {
   letter-spacing: 0.12em;
   text-transform: uppercase;
   transition: opacity 180ms ease, transform 180ms ease, box-shadow 180ms ease;
+  white-space: nowrap;
+  flex: 0 0 auto;
 }
 
 .review-content__secondary {
@@ -2073,6 +2147,26 @@ button {
 .review-content__primary:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.review-content__secondary.is-muted,
+.review-content__primary.is-muted {
+  opacity: 1;
+  color: rgba(218, 226, 253, 0.52);
+  border-color: rgba(148, 163, 184, 0.12);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(148, 163, 184, 0.04));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.review-content__primary.is-muted {
+  color: rgba(218, 226, 253, 0.56);
+}
+
+.review-content__secondary.is-muted .material-symbols-outlined,
+.review-content__primary.is-muted .material-symbols-outlined {
+  color: rgba(218, 226, 253, 0.5);
 }
 
 .preview-page {

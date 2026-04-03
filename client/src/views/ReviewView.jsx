@@ -93,11 +93,26 @@ function getEmailParts(email = "") {
     };
   }
 
-  const normalizedBody = bodyLines.join(" ").replace(/\s+/g, " ").trim();
-  const sentences = normalizedBody.match(/[^.!?]+[.!?]+|[^.!?]+$/g)?.map((item) => item.trim()).filter(Boolean) || [];
-  const subject = sentences[0] || "Campaign update";
-  const preview = sentences[1] || "";
-  const body = sentences.slice(2).reduce((chunks, sentence, index) => {
+  const normalizedBody = bodyLines
+    .join(" ")
+    .replace(/\[name\]/gi, "")
+    .replace(/\[cta[^\]]*\]/gi, "")
+    .replace(/dear\s*,?/gi, "")
+    .replace(/dear\s+[a-z\s]+,?/gi, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const sentences =
+    normalizedBody.match(/[^.!?]+[.!?]+|[^.!?]+$/g)?.map((item) => item.trim()).filter(Boolean) || [];
+
+  const firstSentence = sentences[0] || "";
+  const secondSentence = sentences[1] || "";
+  const firstClause = firstSentence.split(/[:,-]/)[0]?.trim() || firstSentence;
+  const compactSubject = firstClause.split(/\s+/).slice(0, 8).join(" ").replace(/[.!?]+$/, "").trim();
+  const subject = compactSubject.length >= 12 ? compactSubject : "Campaign update";
+  const preview = secondSentence || firstSentence;
+  const bodySource = sentences.slice(1).length ? sentences.slice(1) : sentences.slice(0, 3);
+  const body = bodySource.reduce((chunks, sentence, index) => {
     if (index % 2 === 0) {
       chunks.push(sentence);
     } else {
@@ -249,8 +264,10 @@ export default function ReviewView({
 
   const sourceText = hasCampaign ? input?.trim() || "" : "";
   const content = result?.content || {};
+  const isRejected = result?.status === "REJECTED";
+  const isApprovedRun = result?.status === "APPROVED";
   const approvedCount = Object.values(approvedTabs || {}).filter(Boolean).length;
-  const qualityScore = !hasCampaign ? "--" : String(84 + approvedCount * 4);
+  const qualityScore = !hasCampaign ? "--" : isRejected ? "--" : String(84 + approvedCount * 4);
   const activeMeta = tabConfig.find((tab) => tab.key === activeTab) || tabConfig[0];
   const isApproved = Boolean(approvedTabs?.[activeTab]);
 
@@ -350,20 +367,32 @@ export default function ReviewView({
 
           <div className="review-content__footer">
             <div className="review-content__footer-actions">
+              {hasCampaign && isApprovedRun ? (
+                <div className="review-content__success-pill">
+                  <span className="material-symbols-outlined">verified</span>
+                  <span>Editor Approved</span>
+                </div>
+              ) : null}
+              {hasCampaign && isRejected ? (
+                <div className="review-content__success-pill is-rejected">
+                  <span className="material-symbols-outlined">cancel</span>
+                  <span>Editor Rejected</span>
+                </div>
+              ) : null}
               <button
                 type="button"
-                className="review-content__secondary"
+                className={`review-content__secondary ${isRejected ? "is-muted" : ""}`}
                 onClick={() => onRegenerateChannel(activeTab)}
-                disabled={!hasCampaign || actionLoading}
+                disabled={!hasCampaign || actionLoading || isRejected}
               >
                 <span className="material-symbols-outlined">refresh</span>
                 <span>{actionLoading ? "Regenerating..." : `Regenerate ${activeMeta.label}`}</span>
               </button>
               <button
                 type="button"
-                className={`review-content__primary ${isApproved ? "is-approved" : ""}`}
+                className={`review-content__primary ${isApproved ? "is-approved" : ""} ${isRejected ? "is-muted" : ""}`}
                 onClick={() => onApproveChannel(activeTab)}
-                disabled={!hasCampaign || isApproved}
+                disabled={!hasCampaign || isApproved || isRejected}
               >
                 <span className="material-symbols-outlined">check_circle</span>
                 <span>{isApproved ? `${activeMeta.label} Approved` : "Approve Content"}</span>

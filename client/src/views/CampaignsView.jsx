@@ -1,6 +1,6 @@
 const demoInput = `PulseOS 4.2 helps marketing teams turn one source document into a coordinated launch package. It supports a research step that extracts factual claims, a writing step that creates a 400 to 500 word blog post, a five-part tweet thread, and a short email teaser, and an editing step that checks hallucinations, tone, and clarity before approval. The workflow is designed for product marketers, content strategists, and marketing operations teams that need faster content repurposing with less inconsistency.`;
 
-export default function CampaignsView({ input, setInput, onGenerate, loading, error, result }) {
+export default function CampaignsView({ input, setInput, selectedFile, setSelectedFile, onGenerate, loading, error, result }) {
   return (
     <div className="campaigns-page">
       <section className="campaign-hero">
@@ -17,15 +17,28 @@ export default function CampaignsView({ input, setInput, onGenerate, loading, er
           <p>Support for PDF Whitepapers, Case Study URLs, or Podcast Transcripts.</p>
 
           <div className="campaign-uploader__chips">
-            <span><span className="material-symbols-outlined" aria-hidden="true">picture_as_pdf</span>PDF</span>
+            <label className={`campaign-uploader__chip-button ${selectedFile ? "is-active" : ""}`}>
+              <input
+                type="file"
+                accept="application/pdf,.pdf"
+                onChange={async (event) => {
+                  const nextFile = event.target.files?.[0] || null;
+                  await setSelectedFile(nextFile);
+                }}
+              />
+              <span className="material-symbols-outlined" aria-hidden="true">picture_as_pdf</span>
+              <span>{selectedFile ? "PDF READY" : "PDF"}</span>
+            </label>
             <span><span className="material-symbols-outlined" aria-hidden="true">link</span>URL</span>
             <span><span className="material-symbols-outlined" aria-hidden="true">mic</span>AUDIO</span>
           </div>
 
+          {selectedFile ? <div className="campaign-uploader__file-name">{selectedFile.name}</div> : null}
+
           <textarea
             value={input}
             onChange={(event) => setInput(event.target.value)}
-            placeholder="Paste source content here..."
+            placeholder="Paste source content here, or upload a PDF above..."
             rows={8}
           />
 
@@ -33,7 +46,14 @@ export default function CampaignsView({ input, setInput, onGenerate, loading, er
             <button type="button" className="campaign-primary-button" onClick={onGenerate} disabled={loading}>
               {loading ? "Generating..." : "Start Campaign"}
             </button>
-            <button type="button" className="campaign-secondary-button" onClick={() => setInput(demoInput)}>
+            <button
+              type="button"
+              className="campaign-secondary-button"
+              onClick={() => {
+                setInput(demoInput);
+                setSelectedFile(null);
+              }}
+            >
               Load Demo
             </button>
           </div>

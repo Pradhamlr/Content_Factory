@@ -26,6 +26,9 @@ STRICT RULES:
 - Do NOT write generic content
 - Make it product-specific and persuasive
 - Highlight the value proposition clearly
+- Do NOT invent metrics, percentages, pricing, ROI, or case-study outcomes unless they are explicitly present in the provided facts
+- Do NOT use placeholders such as [Name], [Company], [CTA], or bracketed instructions
+- Do NOT include meta labels like "[CTA button]" or template markers
 
 OUTPUT FORMAT:
 
@@ -41,6 +44,12 @@ TWEETS:
 
 EMAIL:
 - Short, compelling, CTA-driven
+- Write it as a real email teaser for immediate use
+- Begin with "Subject: ..."
+- Next line must begin with "Preview: ..."
+- Then write a short email body in 2-3 compact paragraphs
+- Use a direct CTA sentence in plain text, not a bracketed placeholder
+- Never write in all caps
 
 Return structured JSON:
 {
