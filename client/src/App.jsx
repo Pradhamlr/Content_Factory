@@ -280,7 +280,16 @@ export default function App() {
             />
           ) : null}
 
-          {activeView === "agents" ? <AgentsView liveLogs={liveLogs} agentStages={agentStages} loading={loading} result={result} hasCampaign={hasCampaign} /> : null}
+          {activeView === "agents" ? (
+            <AgentsView
+              liveLogs={liveLogs}
+              agentStages={agentStages}
+              loading={loading}
+              result={result}
+              hasCampaign={hasCampaign}
+              deployment={deployment}
+            />
+          ) : null}
 
           {activeView === "analysis" ? (
             <ReviewView

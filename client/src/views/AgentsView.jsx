@@ -22,6 +22,24 @@ function countWords(value) {
   return value.trim().split(/\s+/).length;
 }
 
+function getAmbiguities(result) {
+  const ambiguities = Array.isArray(result?.facts?.ambiguities) ? result.facts.ambiguities : [];
+
+  return ambiguities
+    .map((item) => {
+      if (typeof item === "string") {
+        return item;
+      }
+
+      if (item && typeof item === "object") {
+        return item.statement || item.issue || item.text || JSON.stringify(item);
+      }
+
+      return "";
+    })
+    .filter(Boolean);
+}
+
 function buildArtifacts(result) {
   if (!result?.content) {
     return [];
@@ -94,6 +112,41 @@ function buildTasks(result) {
   return tasks;
 }
 
+function buildVerdict(result) {
+  const attempts = Number(result?.attempts || 0);
+  const approved = result?.status === "APPROVED";
+
+  if (!attempts) {
+    return {
+      label: "Waiting for first review",
+      detail: "Gatekeeper verdict will appear after the first campaign run.",
+      className: ""
+    };
+  }
+
+  if (approved && attempts > 1) {
+    return {
+      label: `Approved on attempt ${attempts}`,
+      detail: `Initial draft was rejected, then refined through ${attempts - 1} feedback cycle${attempts - 1 === 1 ? "" : "s"}.`,
+      className: "is-approved"
+    };
+  }
+
+  if (approved) {
+    return {
+      label: "Approved on first pass",
+      detail: "The initial draft cleared validation without a rewrite cycle.",
+      className: "is-approved"
+    };
+  }
+
+  return {
+    label: `Rejected after ${attempts} attempt${attempts === 1 ? "" : "s"}`,
+    detail: result?.feedback || "The editor flagged issues that still need correction.",
+    className: "is-rejected"
+  };
+}
+
 function AgentCard({ title, status, active, complete, blocked, accent }) {
   return (
     <article className={`war-agent-card ${active ? "is-active" : ""} ${complete ? "is-complete" : ""} ${blocked ? "is-blocked" : ""} ${accent ? `is-${accent}` : ""}`}>
@@ -109,7 +162,7 @@ function AgentCard({ title, status, active, complete, blocked, accent }) {
   );
 }
 
-export default function AgentsView({ liveLogs, agentStages, loading, result, hasCampaign }) {
+export default function AgentsView({ liveLogs, agentStages, loading, result, hasCampaign, deployment }) {
   const logs = liveLogs.length
     ? liveLogs
     : loading
@@ -119,20 +172,28 @@ export default function AgentsView({ liveLogs, agentStages, loading, result, has
   const telemetry = result?.telemetry;
   const artifacts = buildArtifacts(result);
   const tasks = buildTasks(result);
+  const ambiguities = getAmbiguities(result);
+  const verdict = buildVerdict(result);
+  const attempts = Number(result?.attempts || 0);
 
   const diagnostics = {
     pipelineState: loading ? "ACTIVE" : result?.status || "--",
-    inferenceCore: telemetry?.stageTimings?.writerMs || 0,
-    auditPass: telemetry?.stageTimings?.editorMs || 0,
-    contextWindow: telemetry
-      ? Math.min(
-          100,
-          telemetry.featureCount * 12 +
-            telemetry.audienceCount * 10 +
-            (Array.isArray(result?.content?.tweets) ? result.content.tweets.length * 6 : 0) +
-            (result?.content?.email ? 14 : 0)
-        )
-      : 0
+    researchMs: telemetry?.stageTimings?.researcherMs || 0,
+    writingMs: telemetry?.stageTimings?.writerMs || 0,
+    editingMs: telemetry?.stageTimings?.editorMs || 0,
+    totalMs: telemetry?.durationMs || 0
+  };
+
+  const intelligence = {
+    features: telemetry?.featureCount || 0,
+    audience: telemetry?.audienceCount || 0,
+    ambiguities: telemetry?.ambiguityCount || 0
+  };
+
+  const deploymentState = {
+    deployed: Boolean(deployment?.deployed),
+    channels: Array.isArray(deployment?.deployedChannels) ? deployment.deployedChannels : [],
+    deployedAt: deployment?.deployedAt || null
   };
 
   const researcherStatus = agentStages.researcher.status;
@@ -142,6 +203,12 @@ export default function AgentsView({ liveLogs, agentStages, loading, result, has
   return (
     <div className="war-room-page">
       <div className="war-room-main">
+        <div className="war-room-summary">
+          <div className="war-room-summary__eyebrow">Multi-Agent Pipeline</div>
+          <h2>Iterative validation with feedback optimization across research, writing, and editorial control.</h2>
+          <p>Research &rarr; Write &rarr; Validate &rarr; Refine</p>
+        </div>
+
         <div className="war-room-agents">
           <AgentCard
             title="ANALYTICAL BRAIN"
@@ -167,6 +234,16 @@ export default function AgentsView({ liveLogs, agentStages, loading, result, has
             complete={editorStatus === "complete"}
             accent="gatekeeper"
           />
+        </div>
+
+        <div className="war-room-flow">
+          <span>Research</span>
+          <span className="material-symbols-outlined">east</span>
+          <span>Write</span>
+          <span className="material-symbols-outlined">east</span>
+          <span>Validate</span>
+          <span className="material-symbols-outlined">east</span>
+          <span>Refine</span>
         </div>
 
         <section className="war-room-stream">
@@ -206,13 +283,79 @@ export default function AgentsView({ liveLogs, agentStages, loading, result, has
             </button>
           </div>
         </section>
+
+        <div className="war-room-intelligence-grid">
+          <section className="war-room-insight-card">
+            <div className="war-room-insight-card__title">Iteration Intelligence</div>
+            {hasCampaign ? (
+              <div className="war-room-insight-card__body">
+                <div className="war-room-insight-stat">
+                  <span>Refinement Cycles</span>
+                  <strong>{attempts || 1}</strong>
+                </div>
+                <div className="war-room-checklist">
+                  <div>
+                    <span>Initial Draft</span>
+                    <strong className={attempts > 1 ? "is-rejected" : "is-approved"}>{attempts > 1 ? "Rejected" : "Approved"}</strong>
+                  </div>
+                  <div>
+                    <span>Final Output</span>
+                    <strong className={result?.status === "APPROVED" ? "is-approved" : "is-rejected"}>{result?.status || "--"}</strong>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="war-room-empty">Iteration history becomes visible after the first pipeline run.</div>
+            )}
+          </section>
+
+          <section className="war-room-insight-card">
+            <div className="war-room-insight-card__title">System Intelligence</div>
+            {hasCampaign ? (
+              <div className="war-room-insight-metrics">
+                <div>
+                  <span>Features Extracted</span>
+                  <strong>{intelligence.features}</strong>
+                </div>
+                <div>
+                  <span>Audience Segments</span>
+                  <strong>{intelligence.audience}</strong>
+                </div>
+                <div>
+                  <span>Ambiguities</span>
+                  <strong className={intelligence.ambiguities ? "is-warning" : ""}>{intelligence.ambiguities}</strong>
+                </div>
+              </div>
+            ) : (
+              <div className="war-room-empty">Extraction metrics appear after the Analytical Brain completes.</div>
+            )}
+          </section>
+        </div>
+
+        <section className="war-room-ambiguities">
+          <div className="war-room-ambiguities__header">
+            <div className="war-room-ambiguities__title">
+              <span className="material-symbols-outlined">warning</span>
+              <h3>Ambiguities Detected {hasCampaign ? `(${ambiguities.length})` : ""}</h3>
+            </div>
+          </div>
+          {hasCampaign && ambiguities.length ? (
+            <ul className="war-room-ambiguities__list">
+              {ambiguities.slice(0, 6).map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          ) : (
+            <div className="war-room-empty">Source uncertainty flags from the Analytical Brain will be surfaced here.</div>
+          )}
+        </section>
       </div>
 
       <aside className="war-room-sidebar">
         <section className="war-room-panel">
           <div className="war-room-panel__header">
             <div>
-              <div className="war-room-panel__title">System Diagnostics</div>
+              <div className="war-room-panel__title">Pipeline Performance</div>
               <div className="war-room-panel__subtitle">LIVE RUN TELEMETRY</div>
             </div>
             <button type="button" className="war-room-panel__action" aria-label="Analytics">
@@ -225,31 +368,70 @@ export default function AgentsView({ liveLogs, agentStages, loading, result, has
           </div>
           <div className="war-room-meter">
             <div className="war-room-meter__row">
-              <span>Content Generation</span>
-              <strong>{hasCampaign ? formatDuration(diagnostics.inferenceCore) : "--"}</strong>
+              <span>Research</span>
+              <strong>{hasCampaign ? formatDuration(diagnostics.researchMs) : "--"}</strong>
             </div>
             <div className="war-room-meter__track">
-              <div style={{ width: hasCampaign ? `${Math.min(100, Math.max(10, diagnostics.inferenceCore / 30))}%` : "0%" }}></div>
+              <div style={{ width: hasCampaign ? `${Math.min(100, Math.max(10, diagnostics.researchMs / 30))}%` : "0%" }}></div>
             </div>
           </div>
           <div className="war-room-meter">
             <div className="war-room-meter__row">
-              <span>Editorial Audit</span>
-              <strong>{hasCampaign ? formatDuration(diagnostics.auditPass) : "--"}</strong>
+              <span>Writing</span>
+              <strong>{hasCampaign ? formatDuration(diagnostics.writingMs) : "--"}</strong>
             </div>
             <div className="war-room-meter__track">
-              <div style={{ width: hasCampaign ? `${Math.min(100, Math.max(10, diagnostics.auditPass / 30))}%` : "0%" }}></div>
+              <div style={{ width: hasCampaign ? `${Math.min(100, Math.max(10, diagnostics.writingMs / 30))}%` : "0%" }}></div>
             </div>
           </div>
           <div className="war-room-meter">
             <div className="war-room-meter__row">
-              <span>Context Coverage</span>
-              <strong>{hasCampaign ? `${diagnostics.contextWindow}% Full` : "--"}</strong>
+              <span>Editing</span>
+              <strong>{hasCampaign ? formatDuration(diagnostics.editingMs) : "--"}</strong>
+            </div>
+            <div className="war-room-meter__track">
+              <div style={{ width: hasCampaign ? `${Math.min(100, Math.max(10, diagnostics.editingMs / 30))}%` : "0%" }}></div>
+            </div>
+          </div>
+          <div className="war-room-meter">
+            <div className="war-room-meter__row">
+              <span>Total</span>
+              <strong>{hasCampaign ? formatDuration(diagnostics.totalMs) : "--"}</strong>
             </div>
             <div className="war-room-meter__track is-green">
-              <div style={{ width: hasCampaign ? `${diagnostics.contextWindow}%` : "0%" }}></div>
+              <div style={{ width: hasCampaign ? `${Math.min(100, Math.max(12, diagnostics.totalMs / 120))}%` : "0%" }}></div>
             </div>
           </div>
+        </section>
+
+        <section className="war-room-panel">
+          <div className="war-room-panel__title">Gatekeeper Verdict</div>
+          {hasCampaign ? (
+            <div className={`war-room-verdict ${verdict.className}`}>
+              <strong>{verdict.label}</strong>
+              <p>{verdict.detail}</p>
+            </div>
+          ) : (
+            <div className="war-room-empty">Editorial verdict appears after the first review cycle.</div>
+          )}
+        </section>
+
+        <section className="war-room-panel">
+          <div className="war-room-panel__title">Deployment Status</div>
+          {hasCampaign ? (
+            <div className="war-room-deployment">
+              <div className="war-room-panel__label-row">
+                <span>Status</span>
+                <strong>{deploymentState.deployed ? "Deployed" : "Not Deployed"}</strong>
+              </div>
+              <div className="war-room-deployment__channels">
+                {deploymentState.channels.length ? deploymentState.channels.map((channel) => <span key={channel}>{channel}</span>) : <em>Channels: --</em>}
+              </div>
+              <small>{deploymentState.deployedAt ? new Date(deploymentState.deployedAt).toLocaleString() : "Deploy from Preview when approvals are ready."}</small>
+            </div>
+          ) : (
+            <div className="war-room-empty">Deployment state is unlocked after a campaign run.</div>
+          )}
         </section>
 
         <section className="war-room-panel">
@@ -269,7 +451,7 @@ export default function AgentsView({ liveLogs, agentStages, loading, result, has
           )}
         </section>
 
-        {/* <section className="war-room-panel war-room-panel--accent">
+        <section className="war-room-panel war-room-panel--accent">
           <div className="war-room-panel__title">Run Outcomes</div>
           {tasks.length ? (
             <ul>
@@ -280,7 +462,7 @@ export default function AgentsView({ liveLogs, agentStages, loading, result, has
           ) : (
             <div className="war-room-empty">No downstream tasks until a campaign starts.</div>
           )}
-        </section>*/}
+        </section>
 
         <section className="war-room-footer-stats">
           <div>

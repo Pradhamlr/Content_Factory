@@ -1,15 +1,42 @@
-function getBlogTitle(blog) {
-  if (!blog) {
-    return "";
+function toHeadlineCase(value) {
+  return String(value || "")
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => {
+      if (["and", "or", "the", "a", "an", "of", "for", "to", "in", "with", "by"].includes(word)) {
+        return word;
+      }
+
+      return word.charAt(0).toUpperCase() + word.slice(1);
+    })
+    .join(" ")
+    .replace(/^./, (character) => character.toUpperCase());
+}
+
+function buildBlogTitle(blog, facts = {}) {
+  const valueProp = String(facts?.valueProposition || "").replace(/[.!?]+$/, "").trim();
+
+  if (valueProp.length >= 18 && valueProp.length <= 88) {
+    return toHeadlineCase(valueProp);
   }
 
-  const clean = blog.replace(/^#+\s*/gm, "").replace(/\*\*/g, "").trim();
+  const clean = String(blog || "").replace(/^#+\s*/gm, "").replace(/\*\*/g, "").trim();
   const lines = clean.split("\n").map((line) => line.trim()).filter(Boolean);
-  const candidate = lines.find((line) => line.length > 12 && line.length < 90) || "";
-  const firstSentence = candidate.split(/[.!?]/)[0]?.trim() || "";
-  const title = firstSentence.length >= 18 ? firstSentence : candidate;
+  const headingLike = lines.find((line) => line.length >= 18 && line.length <= 88 && !/[,:;].{25,}/.test(line));
 
-  return title.slice(0, 78);
+  if (headingLike) {
+    return headingLike.replace(/[.!?]+$/, "");
+  }
+
+  const firstSentence = clean.match(/[^.!?]+[.!?]/)?.[0]?.trim().replace(/[.!?]+$/, "") || "";
+
+  if (firstSentence) {
+    const shortened = firstSentence.split(/\s+/).slice(0, 12).join(" ");
+    return toHeadlineCase(shortened);
+  }
+
+  return "Campaign Story";
 }
 
 function getBlogParagraphs(blog) {
@@ -142,7 +169,7 @@ export default function PreviewView({
   const blog = result?.content?.blog || "";
   const tweets = Array.isArray(result?.content?.tweets) ? result.content.tweets : [];
   const email = result?.content?.email || "";
-  const blogTitle = getBlogTitle(blog);
+  const blogTitle = buildBlogTitle(blog, result?.facts);
   const blogParagraphs = getBlogParagraphs(blog);
   const firstTweet = tweets[0] || "";
   const approvedCount = Object.values(approvedTabs || {}).filter(Boolean).length;

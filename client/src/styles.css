@@ -606,6 +606,8 @@ button {
   gap: 0;
   height: 100%;
   margin: 0 -1.5rem -1.5rem 0;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .war-room-main {
@@ -614,7 +616,7 @@ button {
   flex-direction: column;
   min-width: 0;
   padding: 1.5rem 1.5rem 1.35rem;
-  overflow: hidden;
+  overflow: visible;
   background: var(--surface);
 }
 
@@ -634,12 +636,209 @@ button {
   z-index: 1;
 }
 
+.war-room-summary {
+  position: relative;
+  z-index: 1;
+  margin-bottom: 1.35rem;
+  padding: 0.15rem 0 0.25rem;
+}
+
+.war-room-summary__eyebrow {
+  margin-bottom: 0.35rem;
+  color: rgba(148, 163, 184, 0.68);
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.war-room-summary h2 {
+  margin: 0;
+  max-width: 46rem;
+  color: var(--text);
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 1.46rem;
+  line-height: 1.16;
+  letter-spacing: -0.03em;
+}
+
+.war-room-summary p {
+  margin: 0.45rem 0 0;
+  color: rgba(148, 163, 184, 0.76);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
 .war-room-agents {
   display: grid;
   grid-template-columns: 1fr 2rem 1fr 2rem 1fr;
   align-items: center;
   gap: 0;
-  margin-bottom: 1.75rem;
+  margin-bottom: 0.9rem;
+}
+
+.war-room-flow {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  margin-bottom: 1.15rem;
+  color: rgba(148, 163, 184, 0.7);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.war-room-flow .material-symbols-outlined {
+  color: var(--primary);
+  font-size: 0.95rem;
+}
+
+.war-room-intelligence-grid {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 1.1rem;
+}
+
+.war-room-insight-card,
+.war-room-ambiguities {
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(59, 73, 75, 0.16);
+  background: linear-gradient(180deg, rgba(22, 30, 49, 0.92), rgba(12, 19, 34, 0.88));
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.01), 0 12px 28px rgba(0, 0, 0, 0.16);
+}
+
+.war-room-insight-card {
+  padding: 1rem 1.1rem;
+}
+
+.war-room-insight-card__title,
+.war-room-ambiguities__title h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.war-room-insight-card__body {
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.war-room-insight-stat {
+  min-width: 8rem;
+  padding: 0.95rem 1rem;
+  border-radius: 0.75rem;
+  background: rgba(6, 14, 32, 0.82);
+  border: 1px solid rgba(59, 73, 75, 0.1);
+}
+
+.war-room-insight-stat span,
+.war-room-checklist span,
+.war-room-insight-metrics span {
+  display: block;
+  color: rgba(148, 163, 184, 0.66);
+  font-size: 0.56rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.war-room-insight-stat strong {
+  display: block;
+  margin-top: 0.35rem;
+  color: var(--text);
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.war-room-checklist {
+  flex: 1;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.war-room-checklist div,
+.war-room-insight-metrics div {
+  padding: 0.82rem 0.95rem;
+  border-radius: 0.75rem;
+  background: rgba(6, 14, 32, 0.82);
+  border: 1px solid rgba(59, 73, 75, 0.1);
+}
+
+.war-room-checklist strong,
+.war-room-insight-metrics strong {
+  display: block;
+  margin-top: 0.3rem;
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.war-room-checklist .is-approved,
+.war-room-verdict.is-approved strong:first-child,
+.war-room-deployment__channels span {
+  color: #d4ff91;
+}
+
+.war-room-checklist .is-rejected,
+.war-room-verdict.is-rejected strong:first-child,
+.war-room-insight-metrics .is-warning {
+  color: #ffb4ab;
+}
+
+.war-room-insight-metrics {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.war-room-ambiguities {
+  position: relative;
+  z-index: 1;
+  margin-bottom: 1.15rem;
+  padding: 1rem 1.1rem;
+}
+
+.war-room-ambiguities__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.war-room-ambiguities__title {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.war-room-ambiguities__title .material-symbols-outlined {
+  color: #ffb4ab;
+  font-size: 1rem;
+}
+
+.war-room-ambiguities__list {
+  margin: 0.85rem 0 0;
+  padding-left: 1rem;
+  color: #c9d8e8;
+  display: grid;
+  gap: 0.5rem;
+  font-size: 0.79rem;
+  line-height: 1.58;
 }
 
 .war-room-link {
@@ -660,9 +859,9 @@ button {
 
 .war-agent-card {
   min-height: 11rem;
-  padding: 1.65rem 1.5rem 1.45rem;
+  padding: 1.6rem 1.45rem 1.38rem;
   border: 1px solid rgba(59, 73, 75, 0.2);
-  background: var(--surface-low);
+  background: linear-gradient(180deg, rgba(20, 28, 46, 0.95), rgba(13, 19, 34, 0.98));
   text-align: center;
   transition: all 500ms ease;
   opacity: 0.78;
@@ -740,6 +939,14 @@ button {
   overflow: hidden;
 }
 
+.war-agent-card.is-complete .war-agent-card__icon.is-brain,
+.war-agent-card.is-complete .war-agent-card__icon.is-voice,
+.war-agent-card.is-complete .war-agent-card__icon.is-gatekeeper {
+  background: rgba(0, 240, 255, 0.08);
+  border-color: rgba(0, 240, 255, 0.35);
+  box-shadow: inset 0 0 18px rgba(0, 240, 255, 0.08);
+}
+
 .war-agent-card__icon.is-voice::after {
   content: "";
   position: absolute;
@@ -754,6 +961,12 @@ button {
 
 .war-agent-card__icon.is-gatekeeper .material-symbols-outlined {
   color: rgba(148, 163, 184, 0.75);
+}
+
+.war-agent-card.is-complete .war-agent-card__icon.is-brain .material-symbols-outlined,
+.war-agent-card.is-complete .war-agent-card__icon.is-voice .material-symbols-outlined,
+.war-agent-card.is-complete .war-agent-card__icon.is-gatekeeper .material-symbols-outlined {
+  color: var(--primary);
 }
 
 .war-agent-card__marker {
@@ -816,12 +1029,12 @@ button {
 .war-room-stream {
   display: flex;
   flex-direction: column;
-  flex: 1;
-  min-height: 0;
+  min-height: 28rem;
+  margin-bottom: 1.2rem;
   overflow: hidden;
   border: 1px solid rgba(59, 73, 75, 0.14);
-  background: rgba(6, 14, 32, 0.5);
-  box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.18);
+  background: linear-gradient(180deg, rgba(6, 14, 32, 0.58), rgba(6, 14, 32, 0.7));
+  box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.18), 0 16px 32px rgba(0, 0, 0, 0.14);
 }
 
 .war-room-stream__head {
@@ -859,7 +1072,7 @@ button {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 1.35rem 1.5rem;
+  padding: 1.2rem 1.45rem 1.3rem;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   scrollbar-width: thin;
   scrollbar-color: rgba(148, 163, 184, 0.35) transparent;
@@ -877,9 +1090,9 @@ button {
 .war-room-log {
   display: flex;
   gap: 1rem;
-  padding: 0.55rem 0;
+  padding: 0.5rem 0;
   font-size: 0.7rem;
-  line-height: 1.72;
+  line-height: 1.68;
 }
 
 .war-room-log--error,
@@ -978,18 +1191,7 @@ button {
   width: 20rem;
   background: #0d1326;
   border-left: 1px solid rgba(59, 73, 75, 0.1);
-  overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(148, 163, 184, 0.3) transparent;
-}
-
-.war-room-sidebar::-webkit-scrollbar {
-  width: 0.45rem;
-}
-
-.war-room-sidebar::-webkit-scrollbar-thumb {
-  border-radius: 999px;
-  background: rgba(148, 163, 184, 0.28);
+  overflow: visible;
 }
 
 .war-room-panel {
@@ -1003,7 +1205,7 @@ button {
 }
 
 .war-room-panel + .war-room-panel {
-  margin-top: 1.35rem;
+  margin-top: 1.15rem;
 }
 
 .war-room-panel__header {
@@ -1017,6 +1219,61 @@ button {
   font-size: 0.5rem;
   letter-spacing: 0.18em;
   text-transform: uppercase;
+}
+
+.war-room-verdict {
+  padding: 1rem 1.05rem;
+  border-radius: 0.75rem;
+  background: linear-gradient(180deg, rgba(12, 18, 33, 0.94), rgba(6, 14, 32, 0.94));
+  border: 1px solid rgba(59, 73, 75, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+}
+
+.war-room-verdict strong {
+  display: block;
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+.war-room-verdict p {
+  margin: 0.45rem 0 0;
+  color: rgba(148, 163, 184, 0.76);
+  font-size: 0.72rem;
+  line-height: 1.55;
+}
+
+.war-room-deployment small {
+  display: block;
+  margin-top: 0.6rem;
+  color: rgba(148, 163, 184, 0.72);
+  font-size: 0.68rem;
+  line-height: 1.5;
+}
+
+.war-room-deployment__channels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 0.75rem;
+}
+
+.war-room-deployment__channels span {
+  padding: 0.35rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(155, 240, 0, 0.08);
+  border: 1px solid rgba(155, 240, 0, 0.16);
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.war-room-deployment__channels em {
+  color: rgba(148, 163, 184, 0.68);
+  font-size: 0.68rem;
+  font-style: normal;
 }
 
 .war-room-panel__action {
@@ -1076,8 +1333,8 @@ button {
   align-items: flex-start;
   gap: 0.75rem;
   padding: 0.95rem 1rem;
-  border-radius: 0.45rem;
-  background: rgba(19, 27, 46, 0.72);
+  border-radius: 0.7rem;
+  background: linear-gradient(180deg, rgba(19, 27, 46, 0.82), rgba(12, 19, 34, 0.92));
   border: 1px solid rgba(59, 73, 75, 0.12);
 }
 
@@ -1132,10 +1389,10 @@ button {
 
 .war-room-panel--accent {
   margin-top: 1.5rem;
-  padding: 1rem;
+  padding: 1rem 1.05rem;
   border: 1px solid rgba(0, 240, 255, 0.35);
-  border-radius: 0.5rem;
-  background: rgba(0, 240, 255, 0.04);
+  border-radius: 0.75rem;
+  background: linear-gradient(180deg, rgba(0, 240, 255, 0.06), rgba(0, 240, 255, 0.03));
 }
 
 .war-room-panel ul {
@@ -1145,6 +1402,12 @@ button {
   font-size: 0.66rem;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   line-height: 1.7;
+}
+
+.war-room-panel--accent ul {
+  margin-top: 0.8rem;
+  display: grid;
+  gap: 0.45rem;
 }
 
 .war-room-panel li + li {
@@ -1739,6 +2002,17 @@ button {
   background: rgba(255, 180, 171, 0.08);
   color: #ffb4ab;
   font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+.review-content__note {
+  margin: 0 1.25rem 0.8rem;
+  padding: 0.8rem 0.9rem;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(250, 204, 21, 0.14);
+  background: rgba(250, 204, 21, 0.06);
+  color: #facc15;
+  font-size: 0.76rem;
   line-height: 1.5;
 }
 
@@ -2419,6 +2693,14 @@ button {
   .campaign-table__row,
   .war-room-agents {
     grid-template-columns: 1fr;
+  }
+
+  .war-room-intelligence-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .war-room-flow {
+    flex-wrap: wrap;
   }
 
   .war-room-link {

@@ -18,23 +18,56 @@ const tabConfig = [
   }
 ];
 
-function getBlogParts(blog = "") {
+function toHeadlineCase(value) {
+  return String(value || "")
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => {
+      if (["and", "or", "the", "a", "an", "of", "for", "to", "in", "with", "by"].includes(word)) {
+        return word;
+      }
+
+      return word.charAt(0).toUpperCase() + word.slice(1);
+    })
+    .join(" ")
+    .replace(/^./, (character) => character.toUpperCase());
+}
+
+function buildBlogTitle(blog = "", facts = {}) {
+  const valueProp = String(facts?.valueProposition || "").replace(/[.!?]+$/, "").trim();
+
+  if (valueProp.length >= 18 && valueProp.length <= 88) {
+    return toHeadlineCase(valueProp);
+  }
+
+  const clean = String(blog || "").replace(/^#+\s*/gm, "").replace(/\*\*/g, "").trim();
+  const lines = clean.split("\n").map((line) => line.trim()).filter(Boolean);
+  const headingLike = lines.find((line) => line.length >= 18 && line.length <= 88 && !/[,:;].{25,}/.test(line));
+
+  if (headingLike) {
+    return headingLike.replace(/[.!?]+$/, "");
+  }
+
+  const firstSentence = clean.match(/[^.!?]+[.!?]/)?.[0]?.trim().replace(/[.!?]+$/, "") || "";
+
+  if (firstSentence) {
+    return toHeadlineCase(firstSentence.split(/\s+/).slice(0, 12).join(" "));
+  }
+
+  return "Campaign Story";
+}
+
+function getBlogParts(blog = "", facts = {}) {
   const paragraphs = blog.split(/\n\s*\n/).map((item) => item.trim()).filter(Boolean);
 
   if (!paragraphs.length) {
     return { title: "No blog title generated yet", intro: "", body: [] };
   }
 
-  const firstParagraph = paragraphs[0];
-  const titleMatch = firstParagraph.match(/^(.{24,120}?[.!?])(?:\s|$)/);
-  const title = (titleMatch?.[1] || firstParagraph.split(/\s+/).slice(0, 10).join(" ")).replace(/\*+/g, "").trim();
-  const remainingIntro = firstParagraph
-    .slice(titleMatch?.[1] ? titleMatch[1].length : title.length)
-    .trim()
-    .replace(/^[,:;.-]\s*/, "");
-
-  const intro = remainingIntro || paragraphs[1] || "";
-  const bodyStartIndex = remainingIntro ? 1 : intro && paragraphs[1] ? 2 : 1;
+  const title = buildBlogTitle(blog, facts);
+  const intro = paragraphs[0] || "";
+  const bodyStartIndex = intro && paragraphs[1] ? 1 : 1;
   const body = paragraphs.slice(bodyStartIndex);
 
   return { title, intro, body };
@@ -85,8 +118,8 @@ function EmptyReviewState() {
   return <div className="review-empty">Generated content will appear here after the campaign finishes.</div>;
 }
 
-function BlogReview({ blog }) {
-  const { title, intro, body } = getBlogParts(blog);
+function BlogReview({ blog, facts }) {
+  const { title, intro, body } = getBlogParts(blog, facts);
 
   if (!blog) {
     return <EmptyReviewState />;
@@ -234,8 +267,9 @@ export default function ReviewView({
       return <EmailReview email={content.email || ""} />;
     }
 
-    return <BlogReview blog={content.blog || ""} />;
-  }, [activeTab, content.blog, content.email, content.tweets, hasCampaign]);
+    return <BlogReview blog={content.blog || ""} facts={result?.facts || {}} />;
+  }, [activeTab, content.blog, content.email, content.tweets, hasCampaign, result?.facts]);
+  const sourceHasMetrics = /\b\d+(?:\.\d+)?\s?(?:%|percent|roi|revenue|latency|ms|gb|users?|customers?)\b/i.test(sourceText);
 
   return (
     <section className="review-page">
@@ -308,6 +342,11 @@ export default function ReviewView({
           <div className="review-content__body">{contentPanel}</div>
 
           {error ? <div className="review-content__error">{error}</div> : null}
+          {hasCampaign && !sourceHasMetrics ? (
+            <div className="review-content__note">
+              Metrics and performance claims should be treated as illustrative unless they are explicitly present in the source input.
+            </div>
+          ) : null}
 
           <div className="review-content__footer">
             <div className="review-content__footer-actions">
