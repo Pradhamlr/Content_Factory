@@ -4,6 +4,21 @@ import { safeJsonParse } from "../utils/safeJson.js";
 import { publish } from "../utils/requestEvents.js";
 import { normalizeCampaignContent } from "../utils/contentShape.js";
 
+function factsContainExternalProofData(facts) {
+  const serializedFacts = JSON.stringify(facts || {}).toLowerCase();
+
+  return (
+    /\b\d+(?:\.\d+)?\s?(?:%|percent|roi|revenue|latency|ms|gb|users?|customers?)\b/.test(serializedFacts) ||
+    /case stud|testimonial|customer story|success story|benchmark|performance data|adoption data/.test(serializedFacts)
+  );
+}
+
+function feedbackDemandsMissingProof(feedback = "") {
+  const normalized = String(feedback).toLowerCase();
+
+  return /metric|percentage|roi|performance data|case stud|testimonial|customer story|benchmark|quantitative|numerical/.test(normalized);
+}
+
 export async function editorAgent(content, facts, context = {}) {
   if (context.requestId) {
     publish(context.requestId, "stage", {
@@ -19,39 +34,75 @@ export async function editorAgent(content, facts, context = {}) {
     messages: [
       {
         role: "system",
-        content: `You are a strict Editor-in-Chief.
+        content: `You are the Editor-in-Chief (Gatekeeper) in a multi-agent AI system.
 
-Reject if:
-- content is generic
-- value proposition is weak
-- facts are not used properly
-- tone is boring or repetitive
-- content contains placeholders like [Name], [CTA], [Company], or bracketed template text
-- content invents unsupported metrics, percentages, ROI, pricing, customer results, or case-study outcomes not present in the facts
+Your role is to strictly validate content quality while remaining grounded in the provided facts.
 
-Approve ONLY if:
-- content is specific
-- clearly uses facts
-- compelling and structured
-- email content is immediately usable and not templated
+PRIMARY GOAL
+- Ensure the content is factually correct
+- Ensure the content is specific and non-generic
+- Ensure the content is clear, structured, and usable
+- Ensure the content remains consistent with the available input data only
 
-Return STRICT JSON:
+CRITICAL RULES
+1. NEVER ask for metrics, percentages, ROI, case studies, testimonials, pricing, benchmarks, or performance claims unless they are explicitly present in the provided facts.
+2. If such data is not present, DO NOT reject because it is missing.
+3. Instead, recommend improvements using only the available facts: clarity, structure, stronger feature usage, sharper value proposition, less generic language.
+4. DO NOT penalize the writer for the lack of data that was never given.
+5. DO reject placeholder or templated content such as [Name], [CTA], [Company], or invented factual claims.
 
-If approved:
+REJECT ONLY IF
+- Content is generic, vague, or repetitive
+- Value proposition is weak or unclear
+- Features are not actually used to support the message
+- Tone is overly promotional, robotic, or templated
+- Unsupported claims are invented
+- Previous feedback was ignored
+
+APPROVE IF
+- Content is factually grounded
+- Uses available features properly
+- Clearly communicates the value proposition
+- Is readable and well structured for the channel
+- Shows reasonable improvement across attempts
+
+ITERATION POLICY
+- Attempt 1: strict rejection is allowed
+- Attempt 2: expect visible improvement, but remain realistic
+- Attempt 3 or later: approve if the content is reasonable given the available facts, even if external proof data is absent
+
+FEEDBACK POLICY
+- If rejecting, give short, actionable feedback
+- Feedback must only ask for changes that can be made from the provided facts
+- Do not ask for any unavailable external evidence
+
+OUTPUT FORMAT
+Return STRICT JSON only.
+
+If APPROVED:
 {
   "status": "APPROVED",
-  "content": ...
+  "content": {...},
+  "confidence": 0.0,
+  "reason": "why the content is acceptable based on available facts"
 }
 
-If rejected:
+If REJECTED:
 {
   "status": "REJECTED",
-  "feedback": "specific improvements needed"
+  "feedback": "clear, actionable improvements using available data only",
+  "confidence": 0.0
 }`
       },
       {
         role: "user",
-        content: JSON.stringify({ facts, content })
+        content: JSON.stringify({
+          attempt: context.attempt || 1,
+          maxAttempts: context.maxAttempts || 1,
+          facts,
+          content,
+          previousFeedback: context.previousFeedback || ""
+        })
       }
     ]
   });
@@ -70,8 +121,22 @@ If rejected:
     throw new Error("Editor agent rejected content without feedback.");
   }
 
+  const mustConverge =
+    (context.attempt || 1) >= (context.maxAttempts || 1) &&
+    !factsContainExternalProofData(facts) &&
+    result.status === "REJECTED" &&
+    feedbackDemandsMissingProof(result.feedback);
+
+  if (mustConverge) {
+    result.status = "APPROVED";
+    result.content = normalizeCampaignContent(content);
+    result.reason = "Approved on the final allowed attempt because the content is reasonable given the available facts and the missing proof data was not present in the input.";
+    result.confidence = typeof result.confidence === "number" ? result.confidence : 0.74;
+    delete result.feedback;
+  }
+
   if (result.status === "APPROVED") {
-    result.content = normalizeCampaignContent(result.content);
+    result.content = normalizeCampaignContent(result.content || content);
   }
 
   await logAgentRun("editor", {

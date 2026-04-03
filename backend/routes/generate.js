@@ -269,7 +269,14 @@ async function runCampaignPipeline(input, requestId) {
     await delay(UX_DELAY_MS);
 
     const editorStartedAt = startTimer();
-    const review = await runWithRecovery("Editor", requestId, () => editorAgent(draft, facts, { requestId }));
+    const review = await runWithRecovery("Editor", requestId, () =>
+      editorAgent(draft, facts, {
+        requestId,
+        attempt: attempts,
+        maxAttempts: MAX_RETRIES + 1,
+        previousFeedback: feedback
+      })
+    );
     stageTimings.editorMs += endTimer(editorStartedAt);
     await delay(UX_DELAY_MS);
 
@@ -488,10 +495,10 @@ router.post("/regenerate", async (req, res, next) => {
       return res.status(400).json({ error: 'Request body must include "facts".' });
     }
 
-    approvalStore.set(requestId, {
-      ...getApprovals(requestId),
-      [channel]: false
-    });
+    const existing = getStoredResult(requestId);
+    const previousApprovals = existing?.approvals || getApprovals(requestId);
+    const previousDeployment = existing?.deployment || getDeployment(requestId);
+    const hadApprovedBaseline = existing?.status === "APPROVED" && existing?.content;
 
     const channelLabel = channel === "tweets" ? "social thread" : channel === "email" ? "email teaser" : "blog post";
     const feedback =
@@ -501,31 +508,53 @@ router.post("/regenerate", async (req, res, next) => {
 
     const draft = await runWithRecovery("Writer", requestId, () => writerAgent(facts, feedback, { requestId }));
     await delay(UX_DELAY_MS);
-    const review = await runWithRecovery("Editor", requestId, () => editorAgent(draft, facts, { requestId }));
+    const review = await runWithRecovery("Editor", requestId, () =>
+      editorAgent(draft, facts, {
+        requestId,
+        attempt: 1,
+        maxAttempts: 1,
+        previousFeedback: feedback
+      })
+    );
 
     const reviewedContent = review.status === "APPROVED" ? mergeCampaignContent(review.content, draft) : mergeCampaignContent(draft, {});
-    const content = replaceChannelContent(currentContent, reviewedContent, channel);
+    const nextApprovals =
+      review.status === "APPROVED"
+        ? {
+            ...previousApprovals,
+            [channel]: false
+          }
+        : previousApprovals;
+    const preservedPrevious = review.status !== "APPROVED" && hadApprovedBaseline;
+    const content = preservedPrevious
+      ? normalizeCampaignContent(existing.content)
+      : replaceChannelContent(currentContent, reviewedContent, channel);
+    const campaignStatus = preservedPrevious ? existing.status : review.status;
+
+    approvalStore.set(requestId, nextApprovals);
+
     const payload = {
       requestId,
       channel,
       content,
-      status: review.status,
-      feedback: review.feedback || "",
+      status: campaignStatus,
+      reviewStatus: review.status,
+      feedback: preservedPrevious ? existing?.feedback || "" : review.feedback || "",
+      regenerationFeedback: review.feedback || "",
       approved: review.status === "APPROVED",
-      approvals: getApprovals(requestId),
-      deployment: getDeployment(requestId)
+      preservedPrevious,
+      approvals: nextApprovals,
+      deployment: previousDeployment
     };
-
-    const existing = getStoredResult(requestId);
 
     if (existing) {
       resultStore.set(requestId, {
         ...existing,
         content,
-        status: review.status,
-        feedback: review.feedback || "",
-        approvals: payload.approvals,
-        deployment: payload.deployment
+        status: campaignStatus,
+        feedback: preservedPrevious ? existing?.feedback || "" : review.feedback || "",
+        approvals: nextApprovals,
+        deployment: previousDeployment
       });
     }
 

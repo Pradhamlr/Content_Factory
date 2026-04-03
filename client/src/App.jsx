@@ -30,6 +30,7 @@ export default function App() {
     tweets: false,
     email: false
   });
+  const [reviewActionState, setReviewActionState] = useState(null);
   const [reviewActionLoading, setReviewActionLoading] = useState(false);
   const [deployment, setDeployment] = useState({
     deployed: false,
@@ -48,8 +49,11 @@ export default function App() {
 
   function resetPipelineState(nextRequestId) {
     setRequestId(nextRequestId);
+    setResult(null);
+    setError("");
     setLiveLogs([]);
     setAgentStages(initialAgentStages);
+    setReviewActionState(null);
     setApprovedTabs({
       blog: false,
       tweets: false,
@@ -196,6 +200,22 @@ export default function App() {
 
     setReviewActionLoading(true);
     setError("");
+    setReviewActionState({
+      type: "regenerate",
+      channel,
+      status: "running",
+      message: `Regenerating ${channel === "tweets" ? "Social Thread" : channel === "email" ? "Email Teaser" : "Blog Post"} only. The other two channels stay intact while the Gatekeeper re-reviews this asset.`
+    });
+    appendLog(
+      `Targeted regeneration started for ${channel === "tweets" ? "Social Thread" : channel === "email" ? "Email Teaser" : "Blog Post"}. Other channels are being preserved.`,
+      "system"
+    );
+    setAgentStages((current) => ({
+      ...current,
+      researcher: { ...current.researcher, status: result?.facts ? "complete" : current.researcher.status },
+      writer: { ...current.writer, status: "running" },
+      editor: { ...current.editor, status: "waiting" }
+    }));
 
     try {
       const payload = await api("/api/generate/regenerate", {
@@ -211,8 +231,32 @@ export default function App() {
       setResult((current) => ({
         ...current,
         content: payload.content,
-        status: payload.status === "APPROVED" ? "APPROVED" : current?.status || "REJECTED",
+        status: payload.status || current?.status || "REJECTED",
         feedback: payload.feedback || current?.feedback || ""
+      }));
+      setReviewActionState({
+        type: "regenerate",
+        channel,
+        status: payload.reviewStatus === "APPROVED" ? "approved" : "rejected",
+        message:
+          payload.reviewStatus === "APPROVED"
+            ? `${channel === "tweets" ? "Social Thread" : channel === "email" ? "Email Teaser" : "Blog Post"} was regenerated and approved. The other channels were preserved.`
+            : payload.preservedPrevious
+            ? `${channel === "tweets" ? "Social Thread" : channel === "email" ? "Email Teaser" : "Blog Post"} regeneration was rejected, so the last approved version was kept and the rest of the campaign remains approved.`
+            : `${channel === "tweets" ? "Social Thread" : channel === "email" ? "Email Teaser" : "Blog Post"} was regenerated but rejected by the Gatekeeper. The other channels were preserved.`
+      });
+      appendLog(
+        payload.reviewStatus === "APPROVED"
+          ? `Targeted regeneration approved for ${channel === "tweets" ? "Social Thread" : channel === "email" ? "Email Teaser" : "Blog Post"}.`
+          : payload.preservedPrevious
+          ? `Targeted regeneration was rejected for ${channel === "tweets" ? "Social Thread" : channel === "email" ? "Email Teaser" : "Blog Post"}, so the previous approved version was retained.`
+          : `Targeted regeneration rejected for ${channel === "tweets" ? "Social Thread" : channel === "email" ? "Email Teaser" : "Blog Post"}.`,
+        "system"
+      );
+      setAgentStages((current) => ({
+        ...current,
+        writer: { ...current.writer, status: "complete" },
+        editor: { ...current.editor, status: payload.reviewStatus === "APPROVED" || payload.preservedPrevious ? "complete" : "rejected" }
       }));
 
       setApprovedTabs(payload.approvals || {
@@ -227,6 +271,17 @@ export default function App() {
       });
     } catch (nextError) {
       setError(nextError.message);
+      setReviewActionState({
+        type: "regenerate",
+        channel,
+        status: "error",
+        message: nextError.message
+      });
+      setAgentStages((current) => ({
+        ...current,
+        writer: { ...current.writer, status: "error" },
+        editor: { ...current.editor, status: "idle" }
+      }));
     } finally {
       setReviewActionLoading(false);
     }
@@ -253,6 +308,16 @@ export default function App() {
         tweets: false,
         email: false
       });
+      setReviewActionState({
+        type: "approval",
+        channel,
+        status: "approved",
+        message: `${channel === "tweets" ? "Social Thread" : channel === "email" ? "Email Teaser" : "Blog Post"} approved and ready for export or deployment.`
+      });
+      appendLog(
+        `${channel === "tweets" ? "Social Thread" : channel === "email" ? "Email Teaser" : "Blog Post"} approval has been locked in for this campaign.`,
+        "system"
+      );
     } catch (nextError) {
       setError(nextError.message);
     }
@@ -339,6 +404,7 @@ export default function App() {
               onApproveChannel={handleApproveChannel}
               onRegenerateChannel={handleRegenerateChannel}
               actionLoading={reviewActionLoading}
+              actionState={reviewActionState}
               error={error}
             />
           ) : null}
