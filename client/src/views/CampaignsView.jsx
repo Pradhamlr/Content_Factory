@@ -116,7 +116,6 @@ export default function CampaignsView({
           <div className="campaign-history__header">
             <div>
               <h3>Saved Campaigns</h3>
-              <p>Resume previous runs from your Supabase-backed campaign store.</p>
             </div>
           </div>
 

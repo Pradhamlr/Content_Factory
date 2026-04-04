@@ -31,6 +31,10 @@ STRICT RULES:
 - Do NOT write generic content
 - Make it product-specific and persuasive
 - Highlight the value proposition clearly
+- Avoid generic openings like "Imagine a world...", "In today's fast-paced world...", or similar AI-sounding filler
+- Start with a strong, specific hook tied directly to the product, problem, or audience in the provided facts
+- Keep sentences concise and structured
+- Focus on clarity over length
 - Do NOT invent metrics, percentages, pricing, ROI, or case-study outcomes unless they are explicitly present in the provided facts
 - Do NOT use placeholders such as [Name], [Company], [CTA], or bracketed instructions
 - Do NOT include meta labels like "[CTA button]" or template markers
@@ -39,13 +43,15 @@ OUTPUT FORMAT:
 
 BLOG:
 - 400-500 words
-- Strong hook in first paragraph
+- Strong, specific hook in the first paragraph
 - Clearly explain the workflow
 - Emphasize benefits
+- Do not begin with a vague visionary setup or generic motivational framing
 
 TWEETS:
 - 5 tweets
 - Engaging, punchy, non-repetitive
+- Open the first post with a specific angle, not generic hype
 
 EMAIL:
 - Short, compelling, CTA-driven
@@ -55,6 +61,7 @@ EMAIL:
 - Then write a short email body in 2-3 compact paragraphs
 - Use a direct CTA sentence in plain text, not a bracketed placeholder
 - Never write in all caps
+- Do not open with generic filler or abstract visionary language
 
 Return structured JSON:
 {

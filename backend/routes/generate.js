@@ -87,6 +87,36 @@ function endTimer(startedAt) {
   return Date.now() - startedAt;
 }
 
+function clampQualityScore(value) {
+  const numeric = typeof value === "number" ? value : Number.parseFloat(value);
+
+  if (!Number.isFinite(numeric)) {
+    return null;
+  }
+
+  return Math.max(0, Math.min(99, Math.round(numeric)));
+}
+
+function buildQualityTelemetry(review, attempts = 1, maxAttempts = MAX_RETRIES + 1) {
+  const confidence =
+    typeof review?.confidence === "number"
+      ? Math.max(0, Math.min(1, review.confidence))
+      : review?.status === "APPROVED"
+        ? 0.82
+        : 0.48;
+  const statusModifier = review?.status === "APPROVED" ? 6 : -8;
+  const attemptModifier = Math.max(0, maxAttempts - attempts) * 2;
+  const score = clampQualityScore(confidence * 100 + statusModifier + attemptModifier);
+
+  return {
+    score,
+    confidence: Number(confidence.toFixed(2)),
+    source: "editor",
+    reason: review?.reason || "",
+    reviewStatus: review?.status || "PENDING"
+  };
+}
+
 async function runWithRecovery(taskName, requestId, runner) {
   let lastError;
 
@@ -403,7 +433,8 @@ async function runCampaignPipeline(input, requestId, source = createSourceDescri
       stageTimings,
       ambiguityCount: Array.isArray(facts?.ambiguities) ? facts.ambiguities.length : 0,
       featureCount: Array.isArray(facts?.features) ? facts.features.length : 0,
-      audienceCount: Array.isArray(facts?.targetAudience) ? facts.targetAudience.length : 0
+      audienceCount: Array.isArray(facts?.targetAudience) ? facts.targetAudience.length : 0,
+      quality: buildQualityTelemetry(finalReview, attempts)
     },
     revisionHistory: createEmptyRevisionHistory()
   });
@@ -711,7 +742,12 @@ router.post("/regenerate", async (req, res, next) => {
         preservedPrevious,
         approvals: nextApprovals,
         deployment: previousDeployment,
-        telemetry: existing?.telemetry || {},
+        telemetry: preservedPrevious
+          ? existing?.telemetry || {}
+          : {
+              ...(existing?.telemetry || {}),
+              quality: buildQualityTelemetry(review, 1, 1)
+            },
         revisionHistory: appendRevision(previousRevisionHistory, channel, {
           reviewStatus: review.status,
           campaignStatus,
@@ -729,6 +765,7 @@ router.post("/regenerate", async (req, res, next) => {
         feedback: preservedPrevious ? existing?.feedback || "" : review.feedback || "",
         approvals: nextApprovals,
         deployment: previousDeployment,
+        telemetry: payload.telemetry,
         revisionHistory: payload.revisionHistory
       };
 

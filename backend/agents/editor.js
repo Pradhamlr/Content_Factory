@@ -20,6 +20,16 @@ function feedbackDemandsMissingProof(feedback = "") {
   return /metric|percentage|roi|performance data|case stud|testimonial|customer story|benchmark|quantitative|numerical/.test(normalized);
 }
 
+function normalizeConfidence(value, fallback = 0.5) {
+  const numeric = typeof value === "number" ? value : Number.parseFloat(value);
+
+  if (!Number.isFinite(numeric)) {
+    return fallback;
+  }
+
+  return Math.min(1, Math.max(0, numeric));
+}
+
 export async function editorAgent(content, facts, context = {}) {
   if (context.requestId) {
     publish(context.requestId, "stage", {
@@ -74,13 +84,15 @@ export async function editorAgent(content, facts, context = {}) {
     result.status = "APPROVED";
     result.content = normalizeCampaignContent(content);
     result.reason = "Approved on the final allowed attempt because the content is reasonable given the available facts and the missing proof data was not present in the input.";
-    result.confidence = typeof result.confidence === "number" ? result.confidence : 0.74;
+    result.confidence = normalizeConfidence(result.confidence, 0.74);
     delete result.feedback;
   }
 
   if (result.status === "APPROVED") {
     result.content = normalizeCampaignContent(result.content || content);
   }
+
+  result.confidence = normalizeConfidence(result.confidence, result.status === "APPROVED" ? 0.82 : 0.48);
 
   await logAgentRun("editor", {
     requestId: context.requestId,

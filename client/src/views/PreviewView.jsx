@@ -173,7 +173,7 @@ export default function PreviewView({
   const blogParagraphs = getBlogParagraphs(blog);
   const firstTweet = tweets[0] || "";
   const approvedCount = Object.values(approvedTabs || {}).filter(Boolean).length;
-  const seoScore = hasCampaign ? Math.min(99, 84 + approvedCount * 4 + Math.min(5, blogParagraphs.length)) : "--";
+  const seoScore = hasCampaign ? result?.telemetry?.quality?.score ?? "--" : "--";
   const omniImpact = hasCampaign ? `${Math.min(100, 48 + approvedCount * 14 + tweets.length * 3)}%` : "--";
   const loadPerformance = hasCampaign && result?.telemetry?.durationMs ? `${(result.telemetry.durationMs / 1000).toFixed(1)}s` : "--";
   const visualSync = hasCampaign ? `${approvedCount}/3 channels approved` : "No review data yet";

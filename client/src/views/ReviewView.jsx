@@ -267,9 +267,7 @@ export default function ReviewView({
   const content = result?.content || {};
   const reviewStatus = result?.reviewStatus || result?.status;
   const isRejected = reviewStatus === "REJECTED";
-  const isApprovedRun = reviewStatus === "APPROVED";
-  const approvedCount = Object.values(approvedTabs || {}).filter(Boolean).length;
-  const qualityScore = !hasCampaign ? "--" : isRejected ? "--" : String(84 + approvedCount * 4);
+  const qualityScore = !hasCampaign ? "--" : result?.telemetry?.quality?.score ?? "--";
   const activeMeta = tabConfig.find((tab) => tab.key === activeTab) || tabConfig[0];
   const isApproved = Boolean(approvedTabs?.[activeTab]);
   const activeRevisions = Array.isArray(result?.revisionHistory?.[activeTab]) ? [...result.revisionHistory[activeTab]].reverse() : [];
