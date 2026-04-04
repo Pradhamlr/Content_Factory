@@ -301,9 +301,6 @@ export default function PreviewView({
           </div>
         </section>
       </div>
-
-      {error ? <div className="preview-page__error">{error}</div> : null}
-
       <div className="preview-stats">
         <div className="preview-stat">
           <div className="preview-stat__label">

@@ -115,12 +115,21 @@ function buildTasks(result) {
 function buildVerdict(result) {
   const attempts = Number(result?.attempts || 0);
   const approved = result?.status === "APPROVED";
+  const reviewStatus = result?.reviewStatus || result?.status;
 
   if (!attempts) {
     return {
       label: "Waiting for first review",
       detail: "Gatekeeper verdict will appear after the first campaign run.",
       className: ""
+    };
+  }
+
+  if (approved && reviewStatus === "REJECTED_PRESERVED") {
+    return {
+      label: "Approved campaign retained",
+      detail: "The latest targeted rewrite was rejected, so the previously approved version was preserved.",
+      className: "is-approved"
     };
   }
 
@@ -177,7 +186,7 @@ export default function AgentsView({ liveLogs, agentStages, loading, result, has
   const attempts = Number(result?.attempts || 0);
 
   const diagnostics = {
-    pipelineState: loading ? "ACTIVE" : result?.status || "--",
+    pipelineState: loading ? "ACTIVE" : result?.reviewStatus || result?.status || "--",
     researchMs: telemetry?.stageTimings?.researcherMs || 0,
     writingMs: telemetry?.stageTimings?.writerMs || 0,
     editingMs: telemetry?.stageTimings?.editorMs || 0,
@@ -301,6 +310,12 @@ export default function AgentsView({ liveLogs, agentStages, loading, result, has
                   <div>
                     <span>Final Output</span>
                     <strong className={result?.status === "APPROVED" ? "is-approved" : "is-rejected"}>{result?.status || "--"}</strong>
+                  </div>
+                  <div>
+                    <span>Latest Review</span>
+                    <strong className={String(result?.reviewStatus || "").includes("REJECTED") ? "is-rejected" : "is-approved"}>
+                      {result?.reviewStatus || "--"}
+                    </strong>
                   </div>
                 </div>
               </div>

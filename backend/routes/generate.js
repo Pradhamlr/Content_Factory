@@ -8,6 +8,7 @@ import { addStream, publish, removeStream } from "../utils/requestEvents.js";
 import { delay } from "../utils/delay.js";
 import { mergeCampaignContent, normalizeCampaignContent } from "../utils/contentShape.js";
 import { extractPdfText } from "../utils/pdfExtractor.js";
+import { appendRevision, buildCampaignState, createEmptyRevisionHistory, createSourceDescriptor } from "../utils/campaignState.js";
 
 const router = Router();
 const MAX_RETRIES = 2;
@@ -228,7 +229,7 @@ async function fetchPreviewImage(payload, variant) {
   return { buffer, contentType };
 }
 
-async function runCampaignPipeline(input, requestId) {
+async function runCampaignPipeline(input, requestId, source = createSourceDescriptor({ type: "text", originalInput: input })) {
   const requestStartedAt = startTimer();
 
   publish(requestId, "lifecycle", {
@@ -298,13 +299,14 @@ async function runCampaignPipeline(input, requestId) {
     message: "Campaign generation finished."
   });
 
-  const payload = {
+  const payload = buildCampaignState({
+    campaignId: requestId,
     requestId,
+    source,
     facts,
     content: finalContent,
-    attempts,
     status: finalReview?.status || "REJECTED",
-    feedback: finalReview?.feedback || "",
+    reviewStatus: finalReview?.status || "REJECTED",
     approvals: getApprovals(requestId),
     deployment: getDeployment(requestId),
     telemetry: {
@@ -315,8 +317,12 @@ async function runCampaignPipeline(input, requestId) {
       ambiguityCount: Array.isArray(facts?.ambiguities) ? facts.ambiguities.length : 0,
       featureCount: Array.isArray(facts?.features) ? facts.features.length : 0,
       audienceCount: Array.isArray(facts?.targetAudience) ? facts.targetAudience.length : 0
-    }
-  };
+    },
+    revisionHistory: createEmptyRevisionHistory()
+  });
+
+  payload.attempts = attempts;
+  payload.feedback = finalReview?.feedback || "";
 
   resultStore.set(requestId, payload);
   return payload;
@@ -390,7 +396,16 @@ router.post("/", async (req, res, next) => {
       });
     }
 
-    const payload = await runCampaignPipeline(input, requestId);
+    const payload = await runCampaignPipeline(
+      input,
+      requestId,
+      createSourceDescriptor({
+        type: "text",
+        label: "Pasted source",
+        originalInput: input,
+        extractedText: input
+      })
+    );
     res.json(payload);
   } catch (error) {
     next(error);
@@ -431,7 +446,16 @@ router.post("/upload", upload.single("file"), async (req, res, next) => {
       message: "PDF text extracted successfully. Starting campaign generation."
     });
 
-    const payload = await runCampaignPipeline(extractedText, requestId);
+    const payload = await runCampaignPipeline(
+      extractedText,
+      requestId,
+      createSourceDescriptor({
+        type: "pdf",
+        label: file.originalname,
+        originalInput: file.originalname,
+        extractedText
+      })
+    );
     res.json({
       ...payload,
       uploadedFile: {
@@ -498,6 +522,7 @@ router.post("/regenerate", async (req, res, next) => {
     const existing = getStoredResult(requestId);
     const previousApprovals = existing?.approvals || getApprovals(requestId);
     const previousDeployment = existing?.deployment || getDeployment(requestId);
+    const previousRevisionHistory = existing?.revisionHistory || createEmptyRevisionHistory();
     const hadApprovedBaseline = existing?.status === "APPROVED" && existing?.content;
 
     const channelLabel = channel === "tweets" ? "social thread" : channel === "email" ? "email teaser" : "blog post";
@@ -534,27 +559,40 @@ router.post("/regenerate", async (req, res, next) => {
     approvalStore.set(requestId, nextApprovals);
 
     const payload = {
+      campaignId: existing?.campaignId || requestId,
       requestId,
+      source: existing?.source || null,
+      facts,
       channel,
       content,
       status: campaignStatus,
-      reviewStatus: review.status,
+      reviewStatus: preservedPrevious ? "REJECTED_PRESERVED" : review.status === "APPROVED" ? "APPROVED" : "REJECTED_UNAPPROVED",
       feedback: preservedPrevious ? existing?.feedback || "" : review.feedback || "",
       regenerationFeedback: review.feedback || "",
       approved: review.status === "APPROVED",
       preservedPrevious,
       approvals: nextApprovals,
-      deployment: previousDeployment
+      deployment: previousDeployment,
+      telemetry: existing?.telemetry || {},
+      revisionHistory: appendRevision(previousRevisionHistory, channel, {
+        reviewStatus: review.status,
+        campaignStatus,
+        preservedPrevious,
+        feedback: review.feedback || "",
+        content: reviewedContent
+      })
     };
 
     if (existing) {
       resultStore.set(requestId, {
         ...existing,
+        reviewStatus: payload.reviewStatus,
         content,
         status: campaignStatus,
         feedback: preservedPrevious ? existing?.feedback || "" : review.feedback || "",
         approvals: nextApprovals,
-        deployment: previousDeployment
+        deployment: previousDeployment,
+        revisionHistory: payload.revisionHistory
       });
     }
 
@@ -588,7 +626,8 @@ router.post("/approve", (req, res) => {
   if (existing) {
     resultStore.set(requestId, {
       ...existing,
-      approvals
+      approvals,
+      reviewStatus: existing.reviewStatus || existing.status
     });
   }
 
@@ -627,7 +666,8 @@ router.post("/deploy", (req, res) => {
   if (existing) {
     resultStore.set(requestId, {
       ...existing,
-      deployment
+      deployment,
+      reviewStatus: existing.reviewStatus || existing.status
     });
   }
 

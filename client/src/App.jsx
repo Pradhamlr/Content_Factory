@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import AppSidebar from "./components/AppSidebar";
 import AppTopbar from "./components/AppTopbar";
+import AppToast from "./components/AppToast";
 import { api, apiForm, buildCampaignKitFile, buildExportFile } from "./lib/api";
 import CampaignsView from "./views/CampaignsView";
 import AgentsView from "./views/AgentsView";
@@ -22,6 +23,7 @@ export default function App() {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [toast, setToast] = useState(null);
   const [requestId, setRequestId] = useState("");
   const [liveLogs, setLiveLogs] = useState([]);
   const [agentStages, setAgentStages] = useState(initialAgentStages);
@@ -48,9 +50,11 @@ export default function App() {
   }, []);
 
   function resetPipelineState(nextRequestId) {
+    window.clearTimeout(showToast.timeoutId);
     setRequestId(nextRequestId);
     setResult(null);
     setError("");
+    setToast(null);
     setLiveLogs([]);
     setAgentStages(initialAgentStages);
     setReviewActionState(null);
@@ -68,6 +72,32 @@ export default function App() {
 
   function appendLog(message, type = "system", timestamp = new Date().toISOString()) {
     setLiveLogs((current) => [...current, { message, type, timestamp }]);
+  }
+
+  function showToast(message, tone = "info", duration = 4200, icon) {
+    const nextToast = {
+      id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      message,
+      tone,
+      duration,
+      icon:
+        icon ||
+        (tone === "approved"
+          ? "verified"
+          : tone === "rejected"
+          ? "error"
+          : tone === "error"
+          ? "warning"
+          : tone === "warning"
+          ? "info"
+          : "notifications")
+    };
+
+    setToast(nextToast);
+    window.clearTimeout(showToast.timeoutId);
+    showToast.timeoutId = window.setTimeout(() => {
+      setToast((current) => (current?.id === nextToast.id ? null : current));
+    }, duration);
   }
 
   function connectStream(nextRequestId) {
@@ -147,6 +177,13 @@ export default function App() {
         tweets: false,
         email: false
       });
+      showToast(
+        payload.status === "APPROVED"
+          ? "Campaign generated and approved by the Gatekeeper."
+          : "Campaign generated, but the final review still needs attention.",
+        payload.status === "APPROVED" ? "approved" : "warning",
+        4200
+      );
       setDeployment(payload.deployment || {
         deployed: false,
         deployedAt: null,
@@ -156,6 +193,7 @@ export default function App() {
       setError(nextError.message);
       setResult(null);
       appendLog(nextError.message, "error");
+      showToast(nextError.message, "error", 5600, "warning");
     } finally {
       setLoading(false);
     }
@@ -176,10 +214,12 @@ export default function App() {
       formData.append("file", file);
       const payload = await apiForm("/api/generate/extract-pdf", formData);
       setInput(payload.extractedText || "");
+      showToast("PDF text extracted into the source field.", "approved", 3200, "upload_file");
     } catch (nextError) {
       setSelectedFile(null);
       setInput("");
       setError(nextError.message);
+      showToast(nextError.message, "error", 5600, "warning");
     } finally {
       setExtractingPdf(false);
     }
@@ -245,6 +285,15 @@ export default function App() {
             ? `${channel === "tweets" ? "Social Thread" : channel === "email" ? "Email Teaser" : "Blog Post"} regeneration was rejected, so the last approved version was kept and the rest of the campaign remains approved.`
             : `${channel === "tweets" ? "Social Thread" : channel === "email" ? "Email Teaser" : "Blog Post"} was regenerated but rejected by the Gatekeeper. The other channels were preserved.`
       });
+      showToast(
+        payload.reviewStatus === "APPROVED"
+          ? `${channel === "tweets" ? "Social Thread" : channel === "email" ? "Email Teaser" : "Blog Post"} approved after regeneration.`
+          : payload.preservedPrevious
+          ? `${channel === "tweets" ? "Social Thread" : channel === "email" ? "Email Teaser" : "Blog Post"} rewrite was rejected, so the previous approved version was kept.`
+          : `${channel === "tweets" ? "Social Thread" : channel === "email" ? "Email Teaser" : "Blog Post"} regeneration was rejected.`,
+        payload.reviewStatus === "APPROVED" ? "approved" : payload.preservedPrevious ? "warning" : "rejected",
+        4800
+      );
       appendLog(
         payload.reviewStatus === "APPROVED"
           ? `Targeted regeneration approved for ${channel === "tweets" ? "Social Thread" : channel === "email" ? "Email Teaser" : "Blog Post"}.`
@@ -282,6 +331,7 @@ export default function App() {
         writer: { ...current.writer, status: "error" },
         editor: { ...current.editor, status: "idle" }
       }));
+      showToast(nextError.message, "error", 5600, "warning");
     } finally {
       setReviewActionLoading(false);
     }
@@ -314,12 +364,18 @@ export default function App() {
         status: "approved",
         message: `${channel === "tweets" ? "Social Thread" : channel === "email" ? "Email Teaser" : "Blog Post"} approved and ready for export or deployment.`
       });
+      showToast(
+        `${channel === "tweets" ? "Social Thread" : channel === "email" ? "Email Teaser" : "Blog Post"} approved.`,
+        "approved",
+        3600
+      );
       appendLog(
         `${channel === "tweets" ? "Social Thread" : channel === "email" ? "Email Teaser" : "Blog Post"} approval has been locked in for this campaign.`,
         "system"
       );
     } catch (nextError) {
       setError(nextError.message);
+      showToast(nextError.message, "error", 5600, "warning");
     }
   }
 
@@ -342,8 +398,10 @@ export default function App() {
         deployedAt: null,
         deployedChannels: []
       });
+      showToast("Campaign deployment updated successfully.", "approved", 3800, "cloud_upload");
     } catch (nextError) {
       setError(nextError.message);
+      showToast(nextError.message, "error", 5600, "warning");
     } finally {
       setPreviewActionLoading(false);
     }
@@ -364,10 +422,11 @@ export default function App() {
 
   return (
     <div className="app-frame">
+      <AppToast toast={toast} />
       <AppSidebar activeView={activeView} onChange={setActiveView} />
 
       <div className="app-main">
-        <AppTopbar activeView={activeView} status={result?.status || (loading ? "PROCESSING" : "STANDBY")} requestId={requestId} />
+        <AppTopbar activeView={activeView} status={result?.reviewStatus || result?.status || (loading ? "PROCESSING" : "STANDBY")} requestId={requestId} />
 
         <main className="app-content">
           {activeView === "campaigns" ? (

@@ -58,8 +58,6 @@ export default function CampaignsView({ input, setInput, selectedFile, setSelect
             </button>
           </div>
         </div>
-
-        {error ? <div className="campaign-error">{error}</div> : null}
       </section>
     </div>
   );

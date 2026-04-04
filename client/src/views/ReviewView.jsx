@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 const tabConfig = [
   {
@@ -258,80 +258,19 @@ export default function ReviewView({
   onApproveChannel,
   onRegenerateChannel,
   actionLoading,
-  actionState,
-  error
+  actionState
 }) {
   const [activeTab, setActiveTab] = useState("blog");
-  const [toast, setToast] = useState(null);
 
   const sourceText = hasCampaign ? input?.trim() || "" : "";
   const content = result?.content || {};
-  const isRejected = result?.status === "REJECTED";
-  const isApprovedRun = result?.status === "APPROVED";
+  const reviewStatus = result?.reviewStatus || result?.status;
+  const isRejected = reviewStatus === "REJECTED";
+  const isApprovedRun = reviewStatus === "APPROVED";
   const approvedCount = Object.values(approvedTabs || {}).filter(Boolean).length;
   const qualityScore = !hasCampaign ? "--" : isRejected ? "--" : String(84 + approvedCount * 4);
   const activeMeta = tabConfig.find((tab) => tab.key === activeTab) || tabConfig[0];
   const isApproved = Boolean(approvedTabs?.[activeTab]);
-  const sourceHasMetrics = /\b\d+(?:\.\d+)?\s?(?:%|percent|roi|revenue|latency|ms|gb|users?|customers?)\b/i.test(sourceText);
-
-  useEffect(() => {
-    if (!hasCampaign || !actionState?.type) {
-      return undefined;
-    }
-
-    const duration = 5200;
-    const tone =
-      actionState.status === "approved" ? "approved" : actionState.status === "rejected" ? "rejected" : actionState.status === "error" ? "error" : "info";
-
-    setToast({
-      id: `action-${Date.now()}`,
-      tone,
-      message: actionState.message,
-      icon: actionState.status === "approved" ? "verified" : actionState.status === "rejected" ? "error" : actionState.status === "error" ? "warning" : "autorenew",
-      duration
-    });
-
-    const timeoutId = setTimeout(() => setToast((current) => (current?.message === actionState.message ? null : current)), duration);
-    return () => clearTimeout(timeoutId);
-  }, [actionState, hasCampaign]);
-
-  useEffect(() => {
-    if (!hasCampaign || sourceHasMetrics) {
-      return undefined;
-    }
-
-    const duration = 7000;
-    const message = "Metrics and performance claims should be treated as illustrative unless they are explicitly present in the source input.";
-
-    setToast({
-      id: `metrics-${result?.requestId || "current"}-${activeTab}`,
-      tone: "warning",
-      message,
-      icon: "info",
-      duration
-    });
-
-    const timeoutId = setTimeout(() => setToast((current) => (current?.message === message ? null : current)), duration);
-    return () => clearTimeout(timeoutId);
-  }, [hasCampaign, sourceHasMetrics, result?.requestId]);
-
-  useEffect(() => {
-    if (!error) {
-      return undefined;
-    }
-
-    const duration = 6500;
-    setToast({
-      id: `error-${Date.now()}`,
-      tone: "error",
-      message: error,
-      icon: "warning",
-      duration
-    });
-
-    const timeoutId = setTimeout(() => setToast((current) => (current?.message === error ? null : current)), duration);
-    return () => clearTimeout(timeoutId);
-  }, [error]);
 
   const contentPanel = useMemo(() => {
     if (!hasCampaign) {
@@ -394,18 +333,6 @@ export default function ReviewView({
         </section>
 
         <section className="review-content">
-          {toast ? (
-            <div className={`review-toast is-${toast.tone}`} key={toast.id}>
-              <div className="review-toast__body">
-                <span className="material-symbols-outlined">{toast.icon}</span>
-                <span>{toast.message}</span>
-              </div>
-              <div className="review-toast__timer">
-                <div key={`${toast.id}-timer`} style={{ animationDuration: `${toast.duration}ms` }}></div>
-              </div>
-            </div>
-          ) : null}
-
           <div className="review-content__tabs">
             <div className="review-content__tab-group">
               <div className="review-content__tab-list">
