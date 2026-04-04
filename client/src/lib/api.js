@@ -38,10 +38,11 @@ export async function downloadFromApi(path, filename) {
   }
 
   const blob = await response.blob();
+  const headerName = response.headers.get("content-disposition")?.match(/filename="?([^"]+)"?/)?.[1];
   const url = window.URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
-  anchor.download = filename || "";
+  anchor.download = filename || headerName || "download";
   anchor.click();
   window.URL.revokeObjectURL(url);
 }

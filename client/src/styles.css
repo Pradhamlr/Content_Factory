@@ -1590,6 +1590,18 @@ textarea:focus-visible {
   border-radius: 0.7rem;
   background: linear-gradient(180deg, rgba(19, 27, 46, 0.82), rgba(12, 19, 34, 0.92));
   border: 1px solid rgba(59, 73, 75, 0.12);
+  width: 100%;
+  text-align: left;
+}
+
+.war-room-artifact:hover:not(:disabled) {
+  border-color: rgba(0, 240, 255, 0.18);
+  transform: translateY(-1px);
+}
+
+.war-room-artifact:disabled {
+  cursor: default;
+  opacity: 0.88;
 }
 
 .war-room-empty,
@@ -1679,6 +1691,11 @@ textarea:focus-visible {
 .war-room-footer-stats > div {
   flex: 1;
   text-align: center;
+}
+
+.review-empty--compact {
+  min-height: 5.25rem;
+  padding: 1rem;
 }
 
 .war-room-footer-stats > div + div {
@@ -1978,6 +1995,75 @@ textarea:focus-visible {
   min-height: 0;
   overflow-y: auto;
   padding: 1.4rem 1.5rem 1.7rem;
+}
+
+.review-history {
+  padding: 0 1.5rem 1.2rem;
+}
+
+.review-history__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.85rem;
+}
+
+.review-history__header h3 {
+  margin: 0;
+  font-size: 0.9rem;
+  font-family: "Space Grotesk", sans-serif;
+}
+
+.review-history__header span {
+  color: rgba(148, 163, 184, 0.76);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.review-history__list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.review-history__item {
+  padding: 0.9rem 1rem;
+  border-radius: 0.75rem;
+  background: rgba(17, 24, 39, 0.9);
+  border: 1px solid rgba(59, 73, 75, 0.14);
+}
+
+.review-history__item-top,
+.review-history__item-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.review-history__item-top strong {
+  color: var(--text);
+  font-size: 0.74rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.review-history__item-top span,
+.review-history__item-meta span {
+  color: rgba(148, 163, 184, 0.76);
+  font-size: 0.68rem;
+}
+
+.review-history__item-meta {
+  margin-top: 0.4rem;
+}
+
+.review-history__item p {
+  margin: 0.7rem 0 0;
+  color: rgba(216, 227, 242, 0.88);
+  font-size: 0.8rem;
+  line-height: 1.55;
 }
 
 .review-toast {
