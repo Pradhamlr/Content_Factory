@@ -17,6 +17,7 @@ const initialAgentStages = {
 
 export default function App() {
   const [activeView, setActiveView] = useState("campaigns");
+  const [sourceMode, setSourceMode] = useState("text");
   const [input, setInput] = useState("");
   const [selectedFile, setSelectedFile] = useState(null);
   const [extractingPdf, setExtractingPdf] = useState(false);
@@ -40,6 +41,8 @@ export default function App() {
     deployedChannels: []
   });
   const [previewActionLoading, setPreviewActionLoading] = useState(false);
+  const [savedCampaigns, setSavedCampaigns] = useState([]);
+  const [campaignsLoading, setCampaignsLoading] = useState(false);
   const eventSourceRef = useRef(null);
   const hasCampaign = Boolean(requestId) || loading || Boolean(result);
 
@@ -47,6 +50,10 @@ export default function App() {
     return () => {
       eventSourceRef.current?.close();
     };
+  }, []);
+
+  useEffect(() => {
+    refreshSavedCampaigns();
   }, []);
 
   function resetPipelineState(nextRequestId) {
@@ -68,6 +75,27 @@ export default function App() {
       deployedAt: null,
       deployedChannels: []
     });
+  }
+
+  function applyCampaignState(payload, nextInput = input) {
+    setResult(payload);
+    setRequestId(payload?.requestId || "");
+    setInput(nextInput);
+    setSelectedFile(null);
+    setApprovedTabs(
+      payload?.approvals || {
+        blog: false,
+        tweets: false,
+        email: false
+      }
+    );
+    setDeployment(
+      payload?.deployment || {
+        deployed: false,
+        deployedAt: null,
+        deployedChannels: []
+      }
+    );
   }
 
   function appendLog(message, type = "system", timestamp = new Date().toISOString()) {
@@ -141,9 +169,22 @@ export default function App() {
     });
   }
 
+  async function refreshSavedCampaigns() {
+    setCampaignsLoading(true);
+
+    try {
+      const payload = await api("/api/campaigns");
+      setSavedCampaigns(Array.isArray(payload?.campaigns) ? payload.campaigns : []);
+    } catch {
+      setSavedCampaigns([]);
+    } finally {
+      setCampaignsLoading(false);
+    }
+  }
+
   async function handleGenerate() {
     if (!input.trim() && !selectedFile) {
-      setError("Please paste source material or upload a PDF before generating content.");
+      setError(sourceMode === "url" ? "Please paste a URL before generating content." : "Please paste source material or upload a PDF before generating content.");
       return;
     }
 
@@ -157,12 +198,18 @@ export default function App() {
     try {
       let payload;
 
-      if (selectedFile) {
+      if (sourceMode === "pdf" && selectedFile) {
         const formData = new FormData();
         formData.append("file", selectedFile);
         formData.append("requestId", nextRequestId);
         payload = await apiForm("/api/generate/upload", formData);
         setInput(payload.extractedText || input);
+      } else if (sourceMode === "url") {
+        payload = await api("/api/generate/url", {
+          method: "POST",
+          body: JSON.stringify({ url: input.trim(), requestId: nextRequestId })
+        });
+        setInput(payload.source?.extractedText || payload.extractedText || input.trim());
       } else {
         payload = await api("/api/generate", {
           method: "POST",
@@ -170,13 +217,7 @@ export default function App() {
         });
       }
 
-      setResult(payload);
-      setRequestId(payload.requestId || nextRequestId);
-      setApprovedTabs(payload.approvals || {
-        blog: false,
-        tweets: false,
-        email: false
-      });
+      applyCampaignState(payload, payload.source?.extractedText || payload.extractedText || input);
       showToast(
         payload.status === "APPROVED"
           ? "Campaign generated and approved by the Gatekeeper."
@@ -184,11 +225,7 @@ export default function App() {
         payload.status === "APPROVED" ? "approved" : "warning",
         4200
       );
-      setDeployment(payload.deployment || {
-        deployed: false,
-        deployedAt: null,
-        deployedChannels: []
-      });
+      await refreshSavedCampaigns();
     } catch (nextError) {
       setError(nextError.message);
       setResult(null);
@@ -200,6 +237,7 @@ export default function App() {
   }
 
   async function handlePdfSelect(file) {
+    setSourceMode(file ? "pdf" : "text");
     setSelectedFile(file);
 
     if (!file) {
@@ -222,6 +260,37 @@ export default function App() {
       showToast(nextError.message, "error", 5600, "warning");
     } finally {
       setExtractingPdf(false);
+    }
+  }
+
+  async function handleLoadCampaign(campaignId) {
+    try {
+      setError("");
+      eventSourceRef.current?.close();
+      const payload = await api(`/api/campaigns/${campaignId}`);
+      const hydratedInput = payload?.source?.extractedText || payload?.source?.originalInput || "";
+      applyCampaignState(payload, hydratedInput);
+      setSourceMode(payload?.source?.type || "text");
+      setAgentStages({
+        researcher: { ...initialAgentStages.researcher, status: payload?.facts ? "complete" : "standby" },
+        writer: { ...initialAgentStages.writer, status: payload?.content ? "complete" : "waiting" },
+        editor: {
+          ...initialAgentStages.editor,
+          status: (payload?.reviewStatus || payload?.status) === "APPROVED" ? "complete" : (payload?.reviewStatus || payload?.status)?.startsWith("REJECTED") ? "rejected" : "idle"
+        }
+      });
+      setLiveLogs([
+        {
+          message: `Loaded saved campaign ${payload.campaignId}.`,
+          type: "system",
+          timestamp: new Date().toISOString()
+        }
+      ]);
+      setActiveView("analysis");
+      showToast("Saved campaign loaded.", "approved", 3200, "folder_open");
+    } catch (nextError) {
+      setError(nextError.message);
+      showToast(nextError.message, "error", 5600, "warning");
     }
   }
 
@@ -318,6 +387,7 @@ export default function App() {
         deployedAt: null,
         deployedChannels: []
       });
+      await refreshSavedCampaigns();
     } catch (nextError) {
       setError(nextError.message);
       setReviewActionState({
@@ -373,6 +443,15 @@ export default function App() {
         `${channel === "tweets" ? "Social Thread" : channel === "email" ? "Email Teaser" : "Blog Post"} approval has been locked in for this campaign.`,
         "system"
       );
+      setResult((current) =>
+        current
+          ? {
+              ...current,
+              approvals: payload.approvals || current.approvals
+            }
+          : current
+      );
+      await refreshSavedCampaigns();
     } catch (nextError) {
       setError(nextError.message);
       showToast(nextError.message, "error", 5600, "warning");
@@ -399,6 +478,15 @@ export default function App() {
         deployedChannels: []
       });
       showToast("Campaign deployment updated successfully.", "approved", 3800, "cloud_upload");
+      setResult((current) =>
+        current
+          ? {
+              ...current,
+              deployment: payload.deployment || current.deployment
+            }
+          : current
+      );
+      await refreshSavedCampaigns();
     } catch (nextError) {
       setError(nextError.message);
       showToast(nextError.message, "error", 5600, "warning");
@@ -433,12 +521,17 @@ export default function App() {
             <CampaignsView
               input={input}
               setInput={setInput}
+              sourceMode={sourceMode}
+              setSourceMode={setSourceMode}
               selectedFile={selectedFile}
               setSelectedFile={handlePdfSelect}
               onGenerate={handleGenerate}
               loading={loading || extractingPdf}
               error={error}
               result={result}
+              savedCampaigns={savedCampaigns}
+              campaignsLoading={campaignsLoading}
+              onLoadCampaign={handleLoadCampaign}
             />
           ) : null}
 
@@ -464,7 +557,6 @@ export default function App() {
               onRegenerateChannel={handleRegenerateChannel}
               actionLoading={reviewActionLoading}
               actionState={reviewActionState}
-              error={error}
             />
           ) : null}
 

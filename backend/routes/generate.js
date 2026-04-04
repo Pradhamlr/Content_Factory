@@ -8,7 +8,9 @@ import { addStream, publish, removeStream } from "../utils/requestEvents.js";
 import { delay } from "../utils/delay.js";
 import { mergeCampaignContent, normalizeCampaignContent } from "../utils/contentShape.js";
 import { extractPdfText } from "../utils/pdfExtractor.js";
+import { getCampaignByRequestId, saveCampaign } from "../repositories/campaignRepository.js";
 import { appendRevision, buildCampaignState, createEmptyRevisionHistory, createSourceDescriptor } from "../utils/campaignState.js";
+import { extractUrlText } from "../utils/urlExtractor.js";
 
 const router = Router();
 const MAX_RETRIES = 2;
@@ -23,6 +25,34 @@ const upload = multer({
 const approvalStore = new Map();
 const deploymentStore = new Map();
 const resultStore = new Map();
+
+function createDefaultApprovals() {
+  return {
+    blog: false,
+    tweets: false,
+    email: false
+  };
+}
+
+function createDefaultDeployment() {
+  return {
+    deployed: false,
+    deployedAt: null,
+    deployedChannels: []
+  };
+}
+
+function cacheCampaign(payload) {
+  if (!payload?.requestId) {
+    return payload;
+  }
+
+  resultStore.set(payload.requestId, payload);
+  approvalStore.set(payload.requestId, payload.approvals || createDefaultApprovals());
+  deploymentStore.set(payload.requestId, payload.deployment || createDefaultDeployment());
+
+  return payload;
+}
 
 function startTimer() {
   return Date.now();
@@ -74,23 +104,27 @@ function replaceChannelContent(currentContent, nextContent, channel) {
 }
 
 function getApprovals(requestId) {
-  return approvalStore.get(requestId) || {
-    blog: false,
-    tweets: false,
-    email: false
-  };
+  return approvalStore.get(requestId) || createDefaultApprovals();
 }
 
 function getDeployment(requestId) {
-  return deploymentStore.get(requestId) || {
-    deployed: false,
-    deployedAt: null,
-    deployedChannels: []
-  };
+  return deploymentStore.get(requestId) || createDefaultDeployment();
 }
 
-function getStoredResult(requestId) {
-  return resultStore.get(requestId) || null;
+async function getStoredResult(requestId) {
+  const cached = resultStore.get(requestId) || null;
+
+  if (cached) {
+    return cached;
+  }
+
+  const stored = await getCampaignByRequestId(requestId);
+
+  if (stored) {
+    cacheCampaign(stored);
+  }
+
+  return stored || null;
 }
 
 function getImageTitle(payload) {
@@ -324,8 +358,9 @@ async function runCampaignPipeline(input, requestId, source = createSourceDescri
   payload.attempts = attempts;
   payload.feedback = finalReview?.feedback || "";
 
-  resultStore.set(requestId, payload);
-  return payload;
+  const savedPayload = await saveCampaign(payload);
+  cacheCampaign(savedPayload || payload);
+  return savedPayload || payload;
 }
 
 router.get("/stream", (req, res) => {
@@ -362,7 +397,7 @@ router.get("/preview-image", async (req, res) => {
     return;
   }
 
-  const payload = getStoredResult(requestId);
+  const payload = await getStoredResult(requestId);
   const title = getImageTitle(payload);
 
   if (!payload) {
@@ -504,6 +539,50 @@ router.post("/extract-pdf", upload.single("file"), async (req, res, next) => {
   }
 });
 
+router.post("/url", async (req, res, next) => {
+  try {
+    const url = req.body?.url;
+    const requestId = req.body?.requestId || crypto.randomUUID();
+
+    if (!url || typeof url !== "string" || !url.trim()) {
+      return res.status(400).json({ error: 'Request body must include a non-empty "url" string.' });
+    }
+
+    publish(requestId, "lifecycle", {
+      requestId,
+      status: "started",
+      message: `URL source received: ${url}`
+    });
+
+    const extracted = await extractUrlText(url.trim());
+
+    publish(requestId, "lifecycle", {
+      requestId,
+      status: "processing",
+      message: "URL content extracted successfully. Starting campaign generation."
+    });
+
+    const payload = await runCampaignPipeline(
+      extracted.extractedText,
+      requestId,
+      createSourceDescriptor({
+        type: "url",
+        label: extracted.title,
+        originalInput: extracted.finalUrl,
+        extractedText: extracted.extractedText
+      })
+    );
+
+    res.json({
+      ...payload,
+      extractedText: extracted.extractedText,
+      sourceUrl: extracted.finalUrl
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.post("/regenerate", async (req, res, next) => {
   try {
     const channel = req.body?.channel;
@@ -519,7 +598,7 @@ router.post("/regenerate", async (req, res, next) => {
       return res.status(400).json({ error: 'Request body must include "facts".' });
     }
 
-    const existing = getStoredResult(requestId);
+    const existing = await getStoredResult(requestId);
     const previousApprovals = existing?.approvals || getApprovals(requestId);
     const previousDeployment = existing?.deployment || getDeployment(requestId);
     const previousRevisionHistory = existing?.revisionHistory || createEmptyRevisionHistory();
@@ -584,7 +663,7 @@ router.post("/regenerate", async (req, res, next) => {
     };
 
     if (existing) {
-      resultStore.set(requestId, {
+      const nextStoredCampaign = {
         ...existing,
         reviewStatus: payload.reviewStatus,
         content,
@@ -593,7 +672,10 @@ router.post("/regenerate", async (req, res, next) => {
         approvals: nextApprovals,
         deployment: previousDeployment,
         revisionHistory: payload.revisionHistory
-      });
+      };
+
+      const savedCampaign = await saveCampaign(nextStoredCampaign);
+      cacheCampaign(savedCampaign || nextStoredCampaign);
     }
 
     res.json(payload);
@@ -602,7 +684,8 @@ router.post("/regenerate", async (req, res, next) => {
   }
 });
 
-router.post("/approve", (req, res) => {
+router.post("/approve", async (req, res, next) => {
+  try {
   const requestId = req.body?.requestId;
   const channel = req.body?.channel;
 
@@ -621,14 +704,17 @@ router.post("/approve", (req, res) => {
 
   approvalStore.set(requestId, approvals);
 
-  const existing = getStoredResult(requestId);
+  const existing = await getStoredResult(requestId);
 
   if (existing) {
-    resultStore.set(requestId, {
+    const nextStoredCampaign = {
       ...existing,
       approvals,
       reviewStatus: existing.reviewStatus || existing.status
-    });
+    };
+
+    const savedCampaign = await saveCampaign(nextStoredCampaign);
+    cacheCampaign(savedCampaign || nextStoredCampaign);
   }
 
   res.json({
@@ -636,9 +722,13 @@ router.post("/approve", (req, res) => {
     channel,
     approvals
   });
+  } catch (error) {
+    next(error);
+  }
 });
 
-router.post("/deploy", (req, res) => {
+router.post("/deploy", async (req, res, next) => {
+  try {
   const requestId = req.body?.requestId;
   const approvals = getApprovals(requestId);
   const approvedChannels = Object.entries(approvals)
@@ -661,20 +751,26 @@ router.post("/deploy", (req, res) => {
 
   deploymentStore.set(requestId, deployment);
 
-  const existing = getStoredResult(requestId);
+  const existing = await getStoredResult(requestId);
 
   if (existing) {
-    resultStore.set(requestId, {
+    const nextStoredCampaign = {
       ...existing,
       deployment,
       reviewStatus: existing.reviewStatus || existing.status
-    });
+    };
+
+    const savedCampaign = await saveCampaign(nextStoredCampaign);
+    cacheCampaign(savedCampaign || nextStoredCampaign);
   }
 
   res.json({
     requestId,
     deployment
   });
+  } catch (error) {
+    next(error);
+  }
 });
 
 export default router;

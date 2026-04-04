@@ -636,6 +636,8 @@ textarea:focus-visible {
   gap: 0.35rem;
   cursor: pointer;
   border: 1px solid transparent;
+  font-family: inherit;
+  text-transform: uppercase;
   transition: border-color 180ms ease, color 180ms ease, background 180ms ease;
 }
 
@@ -680,6 +682,98 @@ textarea:focus-visible {
   justify-content: center;
   gap: 0.9rem;
   margin-top: 1rem;
+}
+
+.campaign-history {
+  margin-top: 1.35rem;
+  padding: 1.25rem 1.35rem;
+  border-radius: 0.85rem;
+  background: rgba(18, 27, 46, 0.86);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+}
+
+.campaign-history__header h3 {
+  margin: 0;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 1rem;
+}
+
+.campaign-history__header p {
+  margin: 0.35rem 0 0;
+  color: rgba(148, 163, 184, 0.82);
+  font-size: 0.8rem;
+}
+
+.campaign-history__list {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.campaign-history__item {
+  width: 100%;
+  padding: 0.95rem 1rem;
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  border-radius: 0.65rem;
+  background: rgba(10, 18, 34, 0.84);
+  color: var(--text);
+  text-align: left;
+}
+
+.campaign-history__item-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.campaign-history__item-top strong {
+  font-size: 0.9rem;
+}
+
+.campaign-history__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 0.45rem;
+  color: rgba(148, 163, 184, 0.78);
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.campaign-history__status {
+  flex: 0 0 auto;
+  padding: 0.25rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.12);
+  color: rgba(226, 232, 240, 0.92);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.campaign-history__status.is-approved {
+  background: rgba(155, 240, 0, 0.14);
+  color: #d8ff95;
+}
+
+.campaign-history__status.is-rejected,
+.campaign-history__status.is-rejected_unapproved {
+  background: rgba(255, 180, 171, 0.12);
+  color: #ffd1cb;
+}
+
+.campaign-history__status.is-rejected_preserved {
+  background: rgba(250, 204, 21, 0.12);
+  color: #fde68a;
+}
+
+.campaign-history__empty {
+  margin-top: 0.95rem;
+  color: rgba(148, 163, 184, 0.78);
+  font-size: 0.82rem;
 }
 
 .campaign-primary-button,

@@ -1,6 +1,36 @@
 const demoInput = `PulseOS 4.2 helps marketing teams turn one source document into a coordinated launch package. It supports a research step that extracts factual claims, a writing step that creates a 400 to 500 word blog post, a five-part tweet thread, and a short email teaser, and an editing step that checks hallucinations, tone, and clarity before approval. The workflow is designed for product marketers, content strategists, and marketing operations teams that need faster content repurposing with less inconsistency.`;
 
-export default function CampaignsView({ input, setInput, selectedFile, setSelectedFile, onGenerate, loading, error, result }) {
+function formatTimestamp(value) {
+  if (!value) {
+    return "Just now";
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "Recently updated";
+  }
+
+  return date.toLocaleString([], {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit"
+  });
+}
+
+export default function CampaignsView({
+  input,
+  setInput,
+  sourceMode,
+  setSourceMode,
+  selectedFile,
+  setSelectedFile,
+  onGenerate,
+  loading,
+  savedCampaigns,
+  campaignsLoading,
+  onLoadCampaign
+}) {
   return (
     <div className="campaigns-page">
       <section className="campaign-hero">
@@ -17,7 +47,7 @@ export default function CampaignsView({ input, setInput, selectedFile, setSelect
           <p>Support for PDF Whitepapers, Case Study URLs, or Podcast Transcripts.</p>
 
           <div className="campaign-uploader__chips">
-            <label className={`campaign-uploader__chip-button ${selectedFile ? "is-active" : ""}`}>
+            <label className={`campaign-uploader__chip-button ${sourceMode === "pdf" ? "is-active" : ""}`}>
               <input
                 type="file"
                 accept="application/pdf,.pdf"
@@ -29,7 +59,17 @@ export default function CampaignsView({ input, setInput, selectedFile, setSelect
               <span className="material-symbols-outlined" aria-hidden="true">picture_as_pdf</span>
               <span>{selectedFile ? "PDF READY" : "PDF"}</span>
             </label>
-            <span><span className="material-symbols-outlined" aria-hidden="true">link</span>URL</span>
+            <button
+              type="button"
+              className={`campaign-uploader__chip-button ${sourceMode === "url" ? "is-active" : ""}`}
+              onClick={() => {
+                setSelectedFile(null);
+                setSourceMode("url");
+              }}
+            >
+              <span className="material-symbols-outlined" aria-hidden="true">link</span>
+              <span>URL</span>
+            </button>
             <span><span className="material-symbols-outlined" aria-hidden="true">mic</span>AUDIO</span>
           </div>
 
@@ -37,8 +77,11 @@ export default function CampaignsView({ input, setInput, selectedFile, setSelect
 
           <textarea
             value={input}
-            onChange={(event) => setInput(event.target.value)}
-            placeholder="Paste source content here, or upload a PDF above..."
+            onChange={(event) => {
+              setSourceMode(sourceMode === "url" ? "url" : "text");
+              setInput(event.target.value);
+            }}
+            placeholder={sourceMode === "url" ? "Paste an article or product page URL here..." : "Paste source content here, or upload a PDF above..."}
             rows={8}
           />
 
@@ -50,6 +93,7 @@ export default function CampaignsView({ input, setInput, selectedFile, setSelect
               type="button"
               className="campaign-secondary-button"
               onClick={() => {
+                setSourceMode("text");
                 setInput(demoInput);
                 setSelectedFile(null);
               }}
@@ -58,6 +102,43 @@ export default function CampaignsView({ input, setInput, selectedFile, setSelect
             </button>
           </div>
         </div>
+
+        <section className="campaign-history">
+          <div className="campaign-history__header">
+            <div>
+              <h3>Saved Campaigns</h3>
+              <p>Resume previous runs from your Supabase-backed campaign store.</p>
+            </div>
+          </div>
+
+          {campaignsLoading ? (
+            <div className="campaign-history__empty">Loading recent campaigns...</div>
+          ) : savedCampaigns?.length ? (
+            <div className="campaign-history__list">
+              {savedCampaigns.map((campaign) => (
+                <button
+                  key={campaign.campaignId}
+                  type="button"
+                  className="campaign-history__item"
+                  onClick={() => onLoadCampaign(campaign.campaignId)}
+                >
+                  <div className="campaign-history__item-top">
+                    <strong>{campaign.previewTitle}</strong>
+                    <span className={`campaign-history__status is-${String(campaign.reviewStatus || campaign.status || "").toLowerCase()}`}>
+                      {campaign.reviewStatus || campaign.status}
+                    </span>
+                  </div>
+                  <div className="campaign-history__meta">
+                    <span>{campaign.source?.type?.toUpperCase() || "TEXT"}</span>
+                    <span>{formatTimestamp(campaign.updatedAt)}</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="campaign-history__empty">No saved campaigns yet. Start one from text, PDF, or URL.</div>
+          )}
+        </section>
       </section>
     </div>
   );
