@@ -21,6 +21,8 @@ export default function App() {
   const [input, setInput] = useState("");
   const [selectedFile, setSelectedFile] = useState(null);
   const [extractingPdf, setExtractingPdf] = useState(false);
+  const [pdfReviewOpen, setPdfReviewOpen] = useState(false);
+  const [pdfReviewDraft, setPdfReviewDraft] = useState("");
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -75,6 +77,8 @@ export default function App() {
       deployedAt: null,
       deployedChannels: []
     });
+    setPdfReviewOpen(false);
+    setPdfReviewDraft("");
   }
 
   function applyCampaignState(payload, nextInput = input) {
@@ -96,6 +100,8 @@ export default function App() {
         deployedChannels: []
       }
     );
+    setPdfReviewOpen(false);
+    setPdfReviewDraft("");
   }
 
   function appendLog(message, type = "system", timestamp = new Date().toISOString()) {
@@ -183,6 +189,12 @@ export default function App() {
   }
 
   async function handleGenerate() {
+    if (sourceMode === "pdf" && selectedFile && !input.trim()) {
+      setError("Review the extracted PDF text before starting the campaign.");
+      showToast("Review and confirm the extracted PDF text before generating.", "warning", 4200, "picture_as_pdf");
+      return;
+    }
+
     if (!input.trim() && !selectedFile) {
       setError(sourceMode === "url" ? "Please paste a URL before generating content." : "Please paste source material or upload a PDF before generating content.");
       return;
@@ -199,11 +211,20 @@ export default function App() {
       let payload;
 
       if (sourceMode === "pdf" && selectedFile) {
-        const formData = new FormData();
-        formData.append("file", selectedFile);
-        formData.append("requestId", nextRequestId);
-        payload = await apiForm("/api/generate/upload", formData);
-        setInput(payload.extractedText || input);
+        payload = await api("/api/generate", {
+          method: "POST",
+          body: JSON.stringify({
+            input: input.trim(),
+            requestId: nextRequestId,
+            source: {
+              type: "pdf",
+              label: selectedFile.name,
+              originalInput: selectedFile.name,
+              extractedText: input.trim()
+            }
+          })
+        });
+        setInput(input.trim());
       } else if (sourceMode === "url") {
         payload = await api("/api/generate/url", {
           method: "POST",
@@ -239,6 +260,8 @@ export default function App() {
   async function handlePdfSelect(file) {
     setSourceMode(file ? "pdf" : "text");
     setSelectedFile(file);
+    setPdfReviewOpen(false);
+    setPdfReviewDraft("");
 
     if (!file) {
       return;
@@ -251,11 +274,14 @@ export default function App() {
       const formData = new FormData();
       formData.append("file", file);
       const payload = await apiForm("/api/generate/extract-pdf", formData);
-      setInput(payload.extractedText || "");
-      showToast("PDF text extracted into the source field.", "approved", 3200, "upload_file");
+      setPdfReviewDraft(payload.extractedText || "");
+      setPdfReviewOpen(true);
+      showToast("PDF text extracted. Review it before starting the campaign.", "approved", 3600, "upload_file");
     } catch (nextError) {
       setSelectedFile(null);
       setInput("");
+      setPdfReviewOpen(false);
+      setPdfReviewDraft("");
       setError(nextError.message);
       showToast(nextError.message, "error", 5600, "warning");
     } finally {
@@ -266,6 +292,32 @@ export default function App() {
   function handleClearSelectedFile() {
     setSelectedFile(null);
     setSourceMode("text");
+    setPdfReviewOpen(false);
+    setPdfReviewDraft("");
+  }
+
+  function handleApplyPdfReview() {
+    setInput(pdfReviewDraft);
+    setPdfReviewOpen(false);
+    showToast("Reviewed PDF text applied to the source field.", "approved", 3200, "fact_check");
+  }
+
+  function handleCancelPdfReview() {
+    setSelectedFile(null);
+    setSourceMode("text");
+    setPdfReviewOpen(false);
+    setPdfReviewDraft("");
+    showToast("PDF review canceled.", "warning", 2800, "close");
+  }
+
+  function handleLoadDemo() {
+    setSourceMode("text");
+    setInput(
+      "PulseOS 4.2 helps marketing teams turn one source document into a coordinated launch package. It supports a research step that extracts factual claims, a writing step that creates a 400 to 500 word blog post, a five-part tweet thread, and a short email teaser, and an editing step that checks hallucinations, tone, and clarity before approval. The workflow is designed for product marketers, content strategists, and marketing operations teams that need faster content repurposing with less inconsistency."
+    );
+    setSelectedFile(null);
+    setPdfReviewOpen(false);
+    setPdfReviewDraft("");
   }
 
   async function handleLoadCampaign(campaignId) {
@@ -573,6 +625,12 @@ export default function App() {
               selectedFile={selectedFile}
               setSelectedFile={handlePdfSelect}
               onClearSelectedFile={handleClearSelectedFile}
+              pdfReviewOpen={pdfReviewOpen}
+              pdfReviewDraft={pdfReviewDraft}
+              setPdfReviewDraft={setPdfReviewDraft}
+              onApplyPdfReview={handleApplyPdfReview}
+              onCancelPdfReview={handleCancelPdfReview}
+              onLoadDemo={handleLoadDemo}
               onGenerate={handleGenerate}
               loading={loading || extractingPdf}
               savedCampaigns={savedCampaigns}

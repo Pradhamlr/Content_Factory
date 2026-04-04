@@ -515,18 +515,24 @@ router.post("/", async (req, res, next) => {
   try {
     const input = requireNonEmptyString(req.body?.input, "input");
     const requestId = req.body?.requestId || crypto.randomUUID();
+    const sourceOverride = req.body?.source;
+    const sourceDescriptor =
+      sourceOverride && typeof sourceOverride === "object"
+        ? createSourceDescriptor({
+            type: ["text", "pdf", "url"].includes(sourceOverride.type) ? sourceOverride.type : "text",
+            label: typeof sourceOverride.label === "string" ? sourceOverride.label : "",
+            originalInput: typeof sourceOverride.originalInput === "string" ? sourceOverride.originalInput : input,
+            extractedText: typeof sourceOverride.extractedText === "string" ? sourceOverride.extractedText : input
+          })
+        : createSourceDescriptor({
+            type: "text",
+            label: "Pasted source",
+            originalInput: input,
+            extractedText: input
+          });
 
     const payload = await withActionLock(`generate:${requestId}`, () =>
-      runCampaignPipeline(
-        input,
-        requestId,
-        createSourceDescriptor({
-          type: "text",
-          label: "Pasted source",
-          originalInput: input,
-          extractedText: input
-        })
-      )
+      runCampaignPipeline(input, requestId, sourceDescriptor)
     );
     res.json(payload);
   } catch (error) {

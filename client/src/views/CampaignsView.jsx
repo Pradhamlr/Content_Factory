@@ -1,5 +1,3 @@
-const demoInput = `PulseOS 4.2 helps marketing teams turn one source document into a coordinated launch package. It supports a research step that extracts factual claims, a writing step that creates a 400 to 500 word blog post, a five-part tweet thread, and a short email teaser, and an editing step that checks hallucinations, tone, and clarity before approval. The workflow is designed for product marketers, content strategists, and marketing operations teams that need faster content repurposing with less inconsistency.`;
-
 function formatTimestamp(value) {
   if (!value) {
     return "Just now";
@@ -26,6 +24,12 @@ export default function CampaignsView({
   selectedFile,
   setSelectedFile,
   onClearSelectedFile,
+  pdfReviewOpen,
+  pdfReviewDraft,
+  setPdfReviewDraft,
+  onApplyPdfReview,
+  onCancelPdfReview,
+  onLoadDemo,
   onGenerate,
   loading,
   savedCampaigns,
@@ -79,7 +83,7 @@ export default function CampaignsView({
             <div className="campaign-uploader__file-row">
               <div className="campaign-uploader__file-name">{selectedFile.name}</div>
               <button type="button" className="campaign-uploader__clear-file" onClick={onClearSelectedFile} aria-label="Remove selected PDF">
-                <span className="material-symbols-outlined">close</span>
+                <span className="material-symbols-outlined">close_small</span>
               </button>
             </div>
           ) : null}
@@ -87,7 +91,7 @@ export default function CampaignsView({
           <textarea
             value={input}
             onChange={(event) => {
-              setSourceMode(sourceMode === "url" ? "url" : "text");
+              setSourceMode(sourceMode === "url" ? "url" : sourceMode === "pdf" ? "pdf" : "text");
               setInput(event.target.value);
             }}
             placeholder={sourceMode === "url" ? "Paste an article or product page URL here..." : "Paste source content here, or upload a PDF above..."}
@@ -101,11 +105,7 @@ export default function CampaignsView({
             <button
               type="button"
               className="campaign-secondary-button"
-              onClick={() => {
-                setSourceMode("text");
-                setInput(demoInput);
-                setSelectedFile(null);
-              }}
+              onClick={onLoadDemo}
             >
               Load Demo
             </button>
@@ -149,7 +149,7 @@ export default function CampaignsView({
                           onDeleteCampaign(campaign.campaignId);
                         }}
                       >
-                        <span className="material-symbols-outlined">delete</span>
+                        <span className="material-symbols-outlined">delete_outline</span>
                       </button>
                     </div>
                   </div>
@@ -161,6 +161,44 @@ export default function CampaignsView({
           )}
         </section>
       </section>
+
+      {pdfReviewOpen ? (
+        <div className="campaign-modal-backdrop" role="presentation">
+          <div className="campaign-modal" role="dialog" aria-modal="true" aria-labelledby="pdf-review-title">
+            <div className="campaign-modal__header">
+              <div>
+                <div className="campaign-modal__eyebrow">PDF Extraction Review</div>
+                <h3 id="pdf-review-title">Review extracted text before generation</h3>
+                <p>Make quick edits here if the PDF extraction needs cleanup. This reviewed version becomes the campaign source.</p>
+              </div>
+              <button type="button" className="campaign-modal__close" onClick={onCancelPdfReview} aria-label="Close PDF review">
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            <div className="campaign-modal__meta">
+              <span className="material-symbols-outlined" aria-hidden="true">picture_as_pdf</span>
+              <span>{selectedFile?.name || "Selected PDF"}</span>
+            </div>
+
+            <textarea
+              className="campaign-modal__textarea"
+              value={pdfReviewDraft}
+              onChange={(event) => setPdfReviewDraft(event.target.value)}
+              rows={14}
+            />
+
+            <div className="campaign-modal__actions">
+              <button type="button" className="campaign-modal__secondary" onClick={onCancelPdfReview}>
+                Cancel PDF
+              </button>
+              <button type="button" className="campaign-modal__primary" onClick={onApplyPdfReview} disabled={!pdfReviewDraft.trim()}>
+                Use Extracted Text
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
