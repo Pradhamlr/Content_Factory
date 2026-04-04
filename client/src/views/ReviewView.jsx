@@ -261,6 +261,7 @@ export default function ReviewView({
   actionState
 }) {
   const [activeTab, setActiveTab] = useState("blog");
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   const sourceText = hasCampaign ? input?.trim() || "" : "";
   const content = result?.content || {};
@@ -342,7 +343,10 @@ export default function ReviewView({
                     key={tab.key}
                     type="button"
                     className={`review-content__tab ${activeTab === tab.key ? "is-active" : ""}`}
-                    onClick={() => setActiveTab(tab.key)}
+                    onClick={() => {
+                      setActiveTab(tab.key);
+                      setHistoryOpen(false);
+                    }}
                   >
                     {tab.label}
                   </button>
@@ -359,30 +363,35 @@ export default function ReviewView({
 
           <div className="review-content__body">{contentPanel}</div>
 
-          <section className="review-history">
-            <div className="review-history__header">
-              <h3>Revision History</h3>
-              <span>{activeRevisions.length ? `${activeRevisions.length} revision${activeRevisions.length === 1 ? "" : "s"}` : "No revisions yet"}</span>
-            </div>
-            {activeRevisions.length ? (
-              <div className="review-history__list">
-                {activeRevisions.map((entry) => (
-                  <article key={entry.id} className="review-history__item">
-                    <div className="review-history__item-top">
-                      <strong>{entry.reviewStatus || "PENDING"}</strong>
-                      <span>{entry.timestamp ? new Date(entry.timestamp).toLocaleString() : "Unknown time"}</span>
-                    </div>
-                    <div className="review-history__item-meta">
-                      <span>Campaign: {entry.campaignStatus || "--"}</span>
-                      <span>{entry.preservedPrevious ? "Previous approved version retained" : "New draft evaluated"}</span>
-                    </div>
-                    {entry.feedback ? <p>{entry.feedback}</p> : null}
-                  </article>
-                ))}
+          <section className={`review-history ${historyOpen ? "is-open" : ""}`}>
+            <button type="button" className="review-history__toggle" onClick={() => setHistoryOpen((current) => !current)}>
+              <div className="review-history__header">
+                <h3>Revision History</h3>
+                <span>{activeRevisions.length ? `${activeRevisions.length} revision${activeRevisions.length === 1 ? "" : "s"}` : "No revisions yet"}</span>
               </div>
-            ) : (
-              <div className="review-empty review-empty--compact">This channel has not been revised yet. Regenerations will appear here as a traceable review timeline.</div>
-            )}
+              <span className="material-symbols-outlined">{historyOpen ? "expand_less" : "expand_more"}</span>
+            </button>
+            {historyOpen ? (
+              activeRevisions.length ? (
+                <div className="review-history__list">
+                  {activeRevisions.map((entry) => (
+                    <article key={entry.id} className="review-history__item">
+                      <div className="review-history__item-top">
+                        <strong>{entry.reviewStatus || "PENDING"}</strong>
+                        <span>{entry.timestamp ? new Date(entry.timestamp).toLocaleString() : "Unknown time"}</span>
+                      </div>
+                      <div className="review-history__item-meta">
+                        <span>Campaign: {entry.campaignStatus || "--"}</span>
+                        <span>{entry.preservedPrevious ? "Previous approved version retained" : "New draft evaluated"}</span>
+                      </div>
+                      {entry.feedback ? <p>{entry.feedback}</p> : null}
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <div className="review-empty review-empty--compact">This channel has not been revised yet. Regenerations will appear here as a traceable review timeline.</div>
+              )
+            ) : null}
           </section>
 
           <div className="review-content__footer">

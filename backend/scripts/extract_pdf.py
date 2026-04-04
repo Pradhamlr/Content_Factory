@@ -7,6 +7,38 @@ from pathlib import Path
 from pypdf import PdfReader
 
 
+def normalize_text(text: str) -> str:
+    lines = [line.rstrip() for line in text.replace("\r", "").split("\n")]
+    paragraphs: list[str] = []
+    current: list[str] = []
+
+    def flush_current() -> None:
+        nonlocal current
+        if current:
+            paragraphs.append(" ".join(part.strip() for part in current if part.strip()))
+            current = []
+
+    for raw_line in lines:
+        line = raw_line.strip()
+
+        if not line:
+            flush_current()
+            continue
+
+        is_bullet = line.startswith(("-", "*", "\u2022"))
+
+        if is_bullet:
+            flush_current()
+            paragraphs.append(line)
+            continue
+
+        current.append(line)
+
+    flush_current()
+
+    return "\n\n".join(paragraph for paragraph in paragraphs if paragraph).strip()
+
+
 def extract_text(pdf_path: Path) -> str:
     reader = PdfReader(str(pdf_path))
     chunks: list[str] = []
@@ -14,7 +46,7 @@ def extract_text(pdf_path: Path) -> str:
     for page in reader.pages:
         text = page.extract_text() or ""
         if text.strip():
-            chunks.append(text.strip())
+            chunks.append(normalize_text(text))
 
     return "\n\n".join(chunks).strip()
 
