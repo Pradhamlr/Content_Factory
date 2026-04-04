@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import AppSidebar from "./components/AppSidebar";
 import AppTopbar from "./components/AppTopbar";
 import AppToast from "./components/AppToast";
-import { api, apiForm, buildCampaignKitFile, buildExportFile } from "./lib/api";
+import { api, apiForm, buildCampaignKitFile, buildExportFile, downloadFromApi } from "./lib/api";
 import CampaignsView from "./views/CampaignsView";
 import AgentsView from "./views/AgentsView";
 import PlaceholderView from "./views/PlaceholderView";
@@ -495,8 +495,30 @@ export default function App() {
     }
   }
 
+  async function handleArtifactOpen(artifactKey) {
+    if (!result?.campaignId) {
+      return;
+    }
+
+    try {
+      await downloadFromApi(`/api/campaigns/${result.campaignId}/artifacts/${artifactKey}`);
+      showToast("Artifact downloaded.", "approved", 3000, "download");
+    } catch (nextError) {
+      setError(nextError.message);
+      showToast(nextError.message, "error", 5600, "warning");
+    }
+  }
+
   function downloadCampaignKit() {
     if (!result) {
+      return;
+    }
+
+    if (result.campaignId) {
+      downloadFromApi(`/api/campaigns/${result.campaignId}/export`, `campaign-kit-${result.campaignId}.zip`).catch((nextError) => {
+        setError(nextError.message);
+        showToast(nextError.message, "error", 5600, "warning");
+      });
       return;
     }
 
@@ -543,6 +565,7 @@ export default function App() {
               result={result}
               hasCampaign={hasCampaign}
               deployment={deployment}
+              onArtifactOpen={handleArtifactOpen}
             />
           ) : null}
 

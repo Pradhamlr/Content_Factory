@@ -49,6 +49,7 @@ function buildArtifacts(result) {
 
   if (result.content.blog) {
     artifacts.push({
+      key: "blog",
       icon: "description",
       iconClass: "is-cyan",
       title: "Blog_Post.md",
@@ -58,6 +59,7 @@ function buildArtifacts(result) {
 
   if (Array.isArray(result.content.tweets) && result.content.tweets.length) {
     artifacts.push({
+      key: "tweets",
       icon: "alternate_email",
       iconClass: "is-cyan",
       title: "Social_Thread.json",
@@ -67,6 +69,7 @@ function buildArtifacts(result) {
 
   if (result.content.email) {
     artifacts.push({
+      key: "email",
       icon: "mail",
       iconClass: "is-green",
       title: "Email_Teaser.txt",
@@ -75,6 +78,7 @@ function buildArtifacts(result) {
   }
 
   artifacts.push({
+    key: "compliance",
     icon: "fact_check",
     iconClass: result.status === "APPROVED" ? "is-green" : "is-cyan",
     title: "Compliance_Report.json",
@@ -171,7 +175,7 @@ function AgentCard({ title, status, active, complete, blocked, accent }) {
   );
 }
 
-export default function AgentsView({ liveLogs, agentStages, loading, result, hasCampaign, deployment }) {
+export default function AgentsView({ liveLogs, agentStages, loading, result, hasCampaign, deployment, onArtifactOpen }) {
   const logs = liveLogs.length
     ? liveLogs
     : loading
@@ -453,13 +457,13 @@ export default function AgentsView({ liveLogs, agentStages, loading, result, has
           <div className="war-room-panel__title">Recent Artifacts</div>
           {artifacts.length ? (
             artifacts.map((artifact) => (
-              <div key={artifact.title} className="war-room-artifact">
+              <button key={artifact.title} type="button" className="war-room-artifact" onClick={() => onArtifactOpen?.(artifact.key)} disabled={!result?.campaignId}>
                 <span className={`material-symbols-outlined ${artifact.iconClass}`}>{artifact.icon}</span>
                 <div>
                   <strong>{artifact.title}</strong>
                   <small>{artifact.meta}</small>
                 </div>
-              </div>
+              </button>
             ))
           ) : (
             <div className="war-room-empty">Artifacts will appear after a campaign run completes.</div>

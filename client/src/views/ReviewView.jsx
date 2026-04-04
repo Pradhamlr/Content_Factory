@@ -271,6 +271,7 @@ export default function ReviewView({
   const qualityScore = !hasCampaign ? "--" : isRejected ? "--" : String(84 + approvedCount * 4);
   const activeMeta = tabConfig.find((tab) => tab.key === activeTab) || tabConfig[0];
   const isApproved = Boolean(approvedTabs?.[activeTab]);
+  const activeRevisions = Array.isArray(result?.revisionHistory?.[activeTab]) ? [...result.revisionHistory[activeTab]].reverse() : [];
 
   const contentPanel = useMemo(() => {
     if (!hasCampaign) {
@@ -357,6 +358,32 @@ export default function ReviewView({
           </div>
 
           <div className="review-content__body">{contentPanel}</div>
+
+          <section className="review-history">
+            <div className="review-history__header">
+              <h3>Revision History</h3>
+              <span>{activeRevisions.length ? `${activeRevisions.length} revision${activeRevisions.length === 1 ? "" : "s"}` : "No revisions yet"}</span>
+            </div>
+            {activeRevisions.length ? (
+              <div className="review-history__list">
+                {activeRevisions.map((entry) => (
+                  <article key={entry.id} className="review-history__item">
+                    <div className="review-history__item-top">
+                      <strong>{entry.reviewStatus || "PENDING"}</strong>
+                      <span>{entry.timestamp ? new Date(entry.timestamp).toLocaleString() : "Unknown time"}</span>
+                    </div>
+                    <div className="review-history__item-meta">
+                      <span>Campaign: {entry.campaignStatus || "--"}</span>
+                      <span>{entry.preservedPrevious ? "Previous approved version retained" : "New draft evaluated"}</span>
+                    </div>
+                    {entry.feedback ? <p>{entry.feedback}</p> : null}
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <div className="review-empty review-empty--compact">This channel has not been revised yet. Regenerations will appear here as a traceable review timeline.</div>
+            )}
+          </section>
 
           <div className="review-content__footer">
             <div className="review-content__footer-actions">

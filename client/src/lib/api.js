@@ -29,6 +29,23 @@ export async function apiForm(path, formData, options = {}) {
   return payload;
 }
 
+export async function downloadFromApi(path, filename) {
+  const response = await fetch(path);
+
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null);
+    throw new Error(payload?.error || "Download failed.");
+  }
+
+  const blob = await response.blob();
+  const url = window.URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename || "";
+  anchor.click();
+  window.URL.revokeObjectURL(url);
+}
+
 export function buildExportFile(name, payload, type = "application/json") {
   const blob = new Blob([type === "application/json" ? JSON.stringify(payload, null, 2) : payload], { type });
   const url = window.URL.createObjectURL(blob);
