@@ -1,5 +1,6 @@
 import { groq, MODEL } from "../config/groq.js";
 import { logAgentRun } from "../utils/agentLogger.js";
+import { WRITER_SYSTEM_PROMPT } from "../utils/prompts.js";
 import { safeJsonParse } from "../utils/safeJson.js";
 import { publish } from "../utils/requestEvents.js";
 import { normalizeCampaignContent } from "../utils/contentShape.js";
@@ -19,44 +20,7 @@ export async function writerAgent(facts, feedback = "", context = {}) {
     messages: [
       {
         role: "system",
-        content: `You are a senior marketing copywriter.
-
-STRICT RULES:
-- Use ONLY the provided facts
-- Do NOT write generic content
-- Make it product-specific and persuasive
-- Highlight the value proposition clearly
-- Do NOT invent metrics, percentages, pricing, ROI, or case-study outcomes unless they are explicitly present in the provided facts
-- Do NOT use placeholders such as [Name], [Company], [CTA], or bracketed instructions
-- Do NOT include meta labels like "[CTA button]" or template markers
-
-OUTPUT FORMAT:
-
-BLOG:
-- 400-500 words
-- Strong hook in first paragraph
-- Clearly explain the workflow
-- Emphasize benefits
-
-TWEETS:
-- 5 tweets
-- Engaging, punchy, non-repetitive
-
-EMAIL:
-- Short, compelling, CTA-driven
-- Write it as a real email teaser for immediate use
-- Begin with "Subject: ..."
-- Next line must begin with "Preview: ..."
-- Then write a short email body in 2-3 compact paragraphs
-- Use a direct CTA sentence in plain text, not a bracketed placeholder
-- Never write in all caps
-
-Return structured JSON:
-{
-  "blog": "...",
-  "tweets": ["...", "..."],
-  "email": "..."
-}`
+        content: WRITER_SYSTEM_PROMPT
       },
       {
         role: "user",

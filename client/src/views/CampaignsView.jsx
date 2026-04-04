@@ -25,11 +25,13 @@ export default function CampaignsView({
   setSourceMode,
   selectedFile,
   setSelectedFile,
+  onClearSelectedFile,
   onGenerate,
   loading,
   savedCampaigns,
   campaignsLoading,
-  onLoadCampaign
+  onLoadCampaign,
+  onDeleteCampaign
 }) {
   return (
     <div className="campaigns-page">
@@ -73,7 +75,14 @@ export default function CampaignsView({
             <span><span className="material-symbols-outlined" aria-hidden="true">mic</span>AUDIO</span>
           </div>
 
-          {selectedFile ? <div className="campaign-uploader__file-name">{selectedFile.name}</div> : null}
+          {selectedFile ? (
+            <div className="campaign-uploader__file-row">
+              <div className="campaign-uploader__file-name">{selectedFile.name}</div>
+              <button type="button" className="campaign-uploader__clear-file" onClick={onClearSelectedFile} aria-label="Remove selected PDF">
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+          ) : null}
 
           <textarea
             value={input}
@@ -130,7 +139,20 @@ export default function CampaignsView({
                   </div>
                   <div className="campaign-history__meta">
                     <span>{campaign.source?.type?.toUpperCase() || "TEXT"}</span>
-                    <span>{formatTimestamp(campaign.updatedAt)}</span>
+                    <div className="campaign-history__meta-actions">
+                      <span>{formatTimestamp(campaign.updatedAt)}</span>
+                      <button
+                        type="button"
+                        className="campaign-history__delete"
+                        aria-label="Delete campaign"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onDeleteCampaign(campaign.campaignId);
+                        }}
+                      >
+                        <span className="material-symbols-outlined">delete</span>
+                      </button>
+                    </div>
                   </div>
                 </button>
               ))}

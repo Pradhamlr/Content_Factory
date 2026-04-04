@@ -263,6 +263,11 @@ export default function App() {
     }
   }
 
+  function handleClearSelectedFile() {
+    setSelectedFile(null);
+    setSourceMode("text");
+  }
+
   async function handleLoadCampaign(campaignId) {
     try {
       setError("");
@@ -288,6 +293,26 @@ export default function App() {
       ]);
       setActiveView("analysis");
       showToast("Saved campaign loaded.", "approved", 3200, "folder_open");
+    } catch (nextError) {
+      setError(nextError.message);
+      showToast(nextError.message, "error", 5600, "warning");
+    }
+  }
+
+  async function handleDeleteCampaign(campaignId) {
+    try {
+      await api(`/api/campaigns/${campaignId}`, { method: "DELETE" });
+      setSavedCampaigns((current) => current.filter((campaign) => campaign.campaignId !== campaignId));
+
+      if (result?.campaignId === campaignId) {
+        resetPipelineState("");
+        setInput("");
+        setSelectedFile(null);
+        setSourceMode("text");
+        setActiveView("campaigns");
+      }
+
+      showToast("Campaign deleted.", "approved", 3200, "delete");
     } catch (nextError) {
       setError(nextError.message);
       showToast(nextError.message, "error", 5600, "warning");
@@ -547,13 +572,13 @@ export default function App() {
               setSourceMode={setSourceMode}
               selectedFile={selectedFile}
               setSelectedFile={handlePdfSelect}
+              onClearSelectedFile={handleClearSelectedFile}
               onGenerate={handleGenerate}
               loading={loading || extractingPdf}
-              error={error}
-              result={result}
               savedCampaigns={savedCampaigns}
               campaignsLoading={campaignsLoading}
               onLoadCampaign={handleLoadCampaign}
+              onDeleteCampaign={handleDeleteCampaign}
             />
           ) : null}
 

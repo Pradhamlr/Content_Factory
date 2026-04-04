@@ -4,18 +4,23 @@ import multer from "multer";
 import { researcherAgent } from "../agents/researcher.js";
 import { writerAgent } from "../agents/writer.js";
 import { editorAgent } from "../agents/editor.js";
+import { assertUnlocked, withActionLock } from "../utils/actionLocks.js";
 import { addStream, publish, removeStream } from "../utils/requestEvents.js";
 import { delay } from "../utils/delay.js";
 import { mergeCampaignContent, normalizeCampaignContent } from "../utils/contentShape.js";
+import { AppError, badRequest, notFound, timeoutError } from "../utils/errors.js";
 import { extractPdfText } from "../utils/pdfExtractor.js";
+import { logEvent } from "../utils/logger.js";
 import { getCampaignByRequestId, saveCampaign } from "../repositories/campaignRepository.js";
 import { appendRevision, buildCampaignState, createEmptyRevisionHistory, createSourceDescriptor } from "../utils/campaignState.js";
+import { requireNonEmptyString, requireObject, requireOneOf } from "../utils/validation.js";
 import { extractUrlText } from "../utils/urlExtractor.js";
 
 const router = Router();
 const MAX_RETRIES = 2;
 const UX_DELAY_MS = 900;
 const AGENT_RETRY_LIMIT = 2;
+const AGENT_TIMEOUT_MS = 45000;
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
@@ -25,6 +30,7 @@ const upload = multer({
 const approvalStore = new Map();
 const deploymentStore = new Map();
 const resultStore = new Map();
+const requestToCampaignStore = new Map();
 
 function createDefaultApprovals() {
   return {
@@ -48,10 +54,29 @@ function cacheCampaign(payload) {
   }
 
   resultStore.set(payload.requestId, payload);
+  if (payload.campaignId) {
+    requestToCampaignStore.set(payload.campaignId, payload.requestId);
+  }
   approvalStore.set(payload.requestId, payload.approvals || createDefaultApprovals());
   deploymentStore.set(payload.requestId, payload.deployment || createDefaultDeployment());
 
   return payload;
+}
+
+function removeCachedCampaign(payload) {
+  if (!payload) {
+    return;
+  }
+
+  if (payload.requestId) {
+    resultStore.delete(payload.requestId);
+    approvalStore.delete(payload.requestId);
+    deploymentStore.delete(payload.requestId);
+  }
+
+  if (payload.campaignId) {
+    requestToCampaignStore.delete(payload.campaignId);
+  }
 }
 
 function startTimer() {
@@ -67,9 +92,16 @@ async function runWithRecovery(taskName, requestId, runner) {
 
   for (let attempt = 1; attempt <= AGENT_RETRY_LIMIT; attempt += 1) {
     try {
-      return await runner();
+      return await withTimeout(taskName, runner);
     } catch (error) {
       lastError = error;
+
+      logEvent("agent_recovery_retry", {
+        requestId,
+        taskName,
+        attempt,
+        error: error.message
+      });
 
       publish(requestId, "attempt", {
         requestId,
@@ -82,6 +114,23 @@ async function runWithRecovery(taskName, requestId, runner) {
   }
 
   throw lastError;
+}
+
+async function withTimeout(taskName, runner, timeoutMs = AGENT_TIMEOUT_MS) {
+  let timeoutId;
+
+  try {
+    return await Promise.race([
+      runner(),
+      new Promise((_, reject) => {
+        timeoutId = setTimeout(() => {
+          reject(timeoutError(`${taskName} timed out. Please try again.`, { taskName, timeoutMs }));
+        }, timeoutMs);
+      })
+    ]);
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 function replaceChannelContent(currentContent, nextContent, channel) {
@@ -265,6 +314,10 @@ async function fetchPreviewImage(payload, variant) {
 
 async function runCampaignPipeline(input, requestId, source = createSourceDescriptor({ type: "text", originalInput: input })) {
   const requestStartedAt = startTimer();
+  logEvent("campaign_started", {
+    requestId,
+    sourceType: source?.type || "text"
+  });
 
   publish(requestId, "lifecycle", {
     requestId,
@@ -360,6 +413,13 @@ async function runCampaignPipeline(input, requestId, source = createSourceDescri
 
   const savedPayload = await saveCampaign(payload);
   cacheCampaign(savedPayload || payload);
+  logEvent("campaign_completed", {
+    requestId,
+    campaignId: (savedPayload || payload).campaignId,
+    status: (savedPayload || payload).status,
+    reviewStatus: (savedPayload || payload).reviewStatus,
+    attempts
+  });
   return savedPayload || payload;
 }
 
@@ -422,24 +482,20 @@ router.get("/preview-image", async (req, res) => {
 
 router.post("/", async (req, res, next) => {
   try {
-    const input = req.body?.input;
+    const input = requireNonEmptyString(req.body?.input, "input");
     const requestId = req.body?.requestId || crypto.randomUUID();
 
-    if (!input || typeof input !== "string" || !input.trim()) {
-      return res.status(400).json({
-        error: 'Request body must include a non-empty "input" string.'
-      });
-    }
-
-    const payload = await runCampaignPipeline(
-      input,
-      requestId,
-      createSourceDescriptor({
-        type: "text",
-        label: "Pasted source",
-        originalInput: input,
-        extractedText: input
-      })
+    const payload = await withActionLock(`generate:${requestId}`, () =>
+      runCampaignPipeline(
+        input,
+        requestId,
+        createSourceDescriptor({
+          type: "text",
+          label: "Pasted source",
+          originalInput: input,
+          extractedText: input
+        })
+      )
     );
     res.json(payload);
   } catch (error) {
@@ -453,14 +509,14 @@ router.post("/upload", upload.single("file"), async (req, res, next) => {
     const file = req.file;
 
     if (!file) {
-      return res.status(400).json({ error: "Please upload a PDF file." });
+      throw badRequest("Please upload a PDF file.");
     }
 
     const isPdfMime = file.mimetype === "application/pdf";
     const isPdfName = file.originalname?.toLowerCase().endsWith(".pdf");
 
     if (!isPdfMime && !isPdfName) {
-      return res.status(400).json({ error: "Only PDF uploads are supported right now." });
+      throw badRequest("Only PDF uploads are supported right now.");
     }
 
     publish(requestId, "lifecycle", {
@@ -469,36 +525,42 @@ router.post("/upload", upload.single("file"), async (req, res, next) => {
       message: `PDF upload received: ${file.originalname}`
     });
 
-    const extractedText = await extractPdfText(file.buffer);
+    const payload = await withActionLock(`generate:${requestId}`, async () => {
+      const extractedText = await extractPdfText(file.buffer);
 
-    if (!extractedText.trim()) {
-      return res.status(400).json({ error: "No extractable text was found in this PDF." });
-    }
+      if (!extractedText.trim()) {
+        throw badRequest("No extractable text was found in this PDF.");
+      }
 
-    publish(requestId, "lifecycle", {
-      requestId,
-      status: "processing",
-      message: "PDF text extracted successfully. Starting campaign generation."
-    });
+      publish(requestId, "lifecycle", {
+        requestId,
+        status: "processing",
+        message: "PDF text extracted successfully. Starting campaign generation."
+      });
 
-    const payload = await runCampaignPipeline(
-      extractedText,
-      requestId,
-      createSourceDescriptor({
-        type: "pdf",
-        label: file.originalname,
-        originalInput: file.originalname,
+      const generatedPayload = await runCampaignPipeline(
+        extractedText,
+        requestId,
+        createSourceDescriptor({
+          type: "pdf",
+          label: file.originalname,
+          originalInput: file.originalname,
+          extractedText
+        })
+      );
+
+      return {
+        ...generatedPayload,
+        uploadedFile: {
+          name: file.originalname,
+          size: file.size,
+          mimeType: file.mimetype
+        },
         extractedText
-      })
-    );
+      };
+    });
     res.json({
-      ...payload,
-      uploadedFile: {
-        name: file.originalname,
-        size: file.size,
-        mimeType: file.mimetype
-      },
-      extractedText
+      ...payload
     });
   } catch (error) {
     next(error);
@@ -510,20 +572,20 @@ router.post("/extract-pdf", upload.single("file"), async (req, res, next) => {
     const file = req.file;
 
     if (!file) {
-      return res.status(400).json({ error: "Please upload a PDF file." });
+      throw badRequest("Please upload a PDF file.");
     }
 
     const isPdfMime = file.mimetype === "application/pdf";
     const isPdfName = file.originalname?.toLowerCase().endsWith(".pdf");
 
     if (!isPdfMime && !isPdfName) {
-      return res.status(400).json({ error: "Only PDF uploads are supported right now." });
+      throw badRequest("Only PDF uploads are supported right now.");
     }
 
-    const extractedText = await extractPdfText(file.buffer);
+    const extractedText = await withTimeout("PDF extraction", () => extractPdfText(file.buffer), 20000);
 
     if (!extractedText.trim()) {
-      return res.status(400).json({ error: "No extractable text was found in this PDF." });
+      throw badRequest("No extractable text was found in this PDF.");
     }
 
     res.json({
@@ -541,12 +603,8 @@ router.post("/extract-pdf", upload.single("file"), async (req, res, next) => {
 
 router.post("/url", async (req, res, next) => {
   try {
-    const url = req.body?.url;
+    const url = requireNonEmptyString(req.body?.url, "url");
     const requestId = req.body?.requestId || crypto.randomUUID();
-
-    if (!url || typeof url !== "string" || !url.trim()) {
-      return res.status(400).json({ error: 'Request body must include a non-empty "url" string.' });
-    }
 
     publish(requestId, "lifecycle", {
       requestId,
@@ -554,30 +612,34 @@ router.post("/url", async (req, res, next) => {
       message: `URL source received: ${url}`
     });
 
-    const extracted = await extractUrlText(url.trim());
+    const payload = await withActionLock(`generate:${requestId}`, async () => {
+      const extracted = await withTimeout("URL extraction", () => extractUrlText(url.trim()), 20000);
 
-    publish(requestId, "lifecycle", {
-      requestId,
-      status: "processing",
-      message: "URL content extracted successfully. Starting campaign generation."
+      publish(requestId, "lifecycle", {
+        requestId,
+        status: "processing",
+        message: "URL content extracted successfully. Starting campaign generation."
+      });
+
+      const generatedPayload = await runCampaignPipeline(
+        extracted.extractedText,
+        requestId,
+        createSourceDescriptor({
+          type: "url",
+          label: extracted.title,
+          originalInput: extracted.finalUrl,
+          extractedText: extracted.extractedText
+        })
+      );
+
+      return {
+        ...generatedPayload,
+        extractedText: extracted.extractedText,
+        sourceUrl: extracted.finalUrl
+      };
     });
 
-    const payload = await runCampaignPipeline(
-      extracted.extractedText,
-      requestId,
-      createSourceDescriptor({
-        type: "url",
-        label: extracted.title,
-        originalInput: extracted.finalUrl,
-        extractedText: extracted.extractedText
-      })
-    );
-
-    res.json({
-      ...payload,
-      extractedText: extracted.extractedText,
-      sourceUrl: extracted.finalUrl
-    });
+    res.json(payload);
   } catch (error) {
     next(error);
   }
@@ -585,20 +647,16 @@ router.post("/url", async (req, res, next) => {
 
 router.post("/regenerate", async (req, res, next) => {
   try {
-    const channel = req.body?.channel;
-    const facts = req.body?.facts;
+    const channel = requireOneOf(req.body?.channel, "channel", ["blog", "tweets", "email"]);
+    const facts = requireObject(req.body?.facts, "facts");
     const currentContent = req.body?.currentContent;
-    const requestId = req.body?.requestId || crypto.randomUUID();
-
-    if (!["blog", "tweets", "email"].includes(channel)) {
-      return res.status(400).json({ error: 'Request body must include a valid "channel".' });
-    }
-
-    if (!facts || typeof facts !== "object") {
-      return res.status(400).json({ error: 'Request body must include "facts".' });
-    }
+    const requestId = requireNonEmptyString(req.body?.requestId, "requestId");
 
     const existing = await getStoredResult(requestId);
+    if (!existing) {
+      throw notFound("Campaign not found for regeneration.");
+    }
+    assertUnlocked([`generate:${requestId}`, `pipeline:${requestId}`, `deploy:${requestId}`]);
     const previousApprovals = existing?.approvals || getApprovals(requestId);
     const previousDeployment = existing?.deployment || getDeployment(requestId);
     const previousRevisionHistory = existing?.revisionHistory || createEmptyRevisionHistory();
@@ -610,59 +668,59 @@ router.post("/regenerate", async (req, res, next) => {
         ? "Regenerate only the email teaser. Return a clear email-style asset with a concise subject line, a short preview line, and a brief body made of 2-3 compact paragraphs. Do not use all caps, placeholders like [Name], or generic filler."
         : `Regenerate only the ${channelLabel}. Keep every claim grounded in the provided facts and improve specificity, clarity, and structure for this one asset.`;
 
-    const draft = await runWithRecovery("Writer", requestId, () => writerAgent(facts, feedback, { requestId }));
-    await delay(UX_DELAY_MS);
-    const review = await runWithRecovery("Editor", requestId, () =>
-      editorAgent(draft, facts, {
+    const { payload, nextStoredCampaign } = await withActionLock(`regenerate:${requestId}:${channel}`, async () => {
+      const draft = await runWithRecovery("Writer", requestId, () => writerAgent(facts, feedback, { requestId }));
+      await delay(UX_DELAY_MS);
+      const review = await runWithRecovery("Editor", requestId, () =>
+        editorAgent(draft, facts, {
+          requestId,
+          attempt: 1,
+          maxAttempts: 1,
+          previousFeedback: feedback
+        })
+      );
+
+      const reviewedContent = review.status === "APPROVED" ? mergeCampaignContent(review.content, draft) : mergeCampaignContent(draft, {});
+      const nextApprovals =
+        review.status === "APPROVED"
+          ? {
+              ...previousApprovals,
+              [channel]: false
+            }
+          : previousApprovals;
+      const preservedPrevious = review.status !== "APPROVED" && hadApprovedBaseline;
+      const content = preservedPrevious
+        ? normalizeCampaignContent(existing.content)
+        : replaceChannelContent(currentContent, reviewedContent, channel);
+      const campaignStatus = preservedPrevious ? existing.status : review.status;
+
+      approvalStore.set(requestId, nextApprovals);
+
+      const payload = {
+        campaignId: existing?.campaignId || requestId,
         requestId,
-        attempt: 1,
-        maxAttempts: 1,
-        previousFeedback: feedback
-      })
-    );
-
-    const reviewedContent = review.status === "APPROVED" ? mergeCampaignContent(review.content, draft) : mergeCampaignContent(draft, {});
-    const nextApprovals =
-      review.status === "APPROVED"
-        ? {
-            ...previousApprovals,
-            [channel]: false
-          }
-        : previousApprovals;
-    const preservedPrevious = review.status !== "APPROVED" && hadApprovedBaseline;
-    const content = preservedPrevious
-      ? normalizeCampaignContent(existing.content)
-      : replaceChannelContent(currentContent, reviewedContent, channel);
-    const campaignStatus = preservedPrevious ? existing.status : review.status;
-
-    approvalStore.set(requestId, nextApprovals);
-
-    const payload = {
-      campaignId: existing?.campaignId || requestId,
-      requestId,
-      source: existing?.source || null,
-      facts,
-      channel,
-      content,
-      status: campaignStatus,
-      reviewStatus: preservedPrevious ? "REJECTED_PRESERVED" : review.status === "APPROVED" ? "APPROVED" : "REJECTED_UNAPPROVED",
-      feedback: preservedPrevious ? existing?.feedback || "" : review.feedback || "",
-      regenerationFeedback: review.feedback || "",
-      approved: review.status === "APPROVED",
-      preservedPrevious,
-      approvals: nextApprovals,
-      deployment: previousDeployment,
-      telemetry: existing?.telemetry || {},
-      revisionHistory: appendRevision(previousRevisionHistory, channel, {
-        reviewStatus: review.status,
-        campaignStatus,
+        source: existing?.source || null,
+        facts,
+        channel,
+        content,
+        status: campaignStatus,
+        reviewStatus: preservedPrevious ? "REJECTED_PRESERVED" : review.status === "APPROVED" ? "APPROVED" : "REJECTED_UNAPPROVED",
+        feedback: preservedPrevious ? existing?.feedback || "" : review.feedback || "",
+        regenerationFeedback: review.feedback || "",
+        approved: review.status === "APPROVED",
         preservedPrevious,
-        feedback: review.feedback || "",
-        content: reviewedContent
-      })
-    };
+        approvals: nextApprovals,
+        deployment: previousDeployment,
+        telemetry: existing?.telemetry || {},
+        revisionHistory: appendRevision(previousRevisionHistory, channel, {
+          reviewStatus: review.status,
+          campaignStatus,
+          preservedPrevious,
+          feedback: review.feedback || "",
+          content: reviewedContent
+        })
+      };
 
-    if (existing) {
       const nextStoredCampaign = {
         ...existing,
         reviewStatus: payload.reviewStatus,
@@ -674,9 +732,19 @@ router.post("/regenerate", async (req, res, next) => {
         revisionHistory: payload.revisionHistory
       };
 
-      const savedCampaign = await saveCampaign(nextStoredCampaign);
-      cacheCampaign(savedCampaign || nextStoredCampaign);
-    }
+      return { payload, nextStoredCampaign };
+    });
+
+    const savedCampaign = await saveCampaign(nextStoredCampaign);
+    cacheCampaign(savedCampaign || nextStoredCampaign);
+
+    logEvent("campaign_regenerated", {
+      requestId,
+      campaignId: payload.campaignId,
+      channel,
+      reviewStatus: payload.reviewStatus,
+      preservedPrevious: payload.preservedPrevious
+    });
 
     res.json(payload);
   } catch (error) {
@@ -686,16 +754,9 @@ router.post("/regenerate", async (req, res, next) => {
 
 router.post("/approve", async (req, res, next) => {
   try {
-  const requestId = req.body?.requestId;
-  const channel = req.body?.channel;
-
-  if (!requestId || typeof requestId !== "string") {
-    return res.status(400).json({ error: 'Request body must include "requestId".' });
-  }
-
-  if (!["blog", "tweets", "email"].includes(channel)) {
-    return res.status(400).json({ error: 'Request body must include a valid "channel".' });
-  }
+  const requestId = requireNonEmptyString(req.body?.requestId, "requestId");
+  const channel = requireOneOf(req.body?.channel, "channel", ["blog", "tweets", "email"]);
+  assertUnlocked([`generate:${requestId}`, `pipeline:${requestId}`, `deploy:${requestId}`]);
 
   const approvals = {
     ...getApprovals(requestId),
@@ -705,17 +766,24 @@ router.post("/approve", async (req, res, next) => {
   approvalStore.set(requestId, approvals);
 
   const existing = await getStoredResult(requestId);
-
-  if (existing) {
-    const nextStoredCampaign = {
-      ...existing,
-      approvals,
-      reviewStatus: existing.reviewStatus || existing.status
-    };
-
-    const savedCampaign = await saveCampaign(nextStoredCampaign);
-    cacheCampaign(savedCampaign || nextStoredCampaign);
+  if (!existing) {
+    throw notFound("Campaign not found.");
   }
+
+  const nextStoredCampaign = {
+    ...existing,
+    approvals,
+    reviewStatus: existing.reviewStatus || existing.status
+  };
+
+  const savedCampaign = await saveCampaign(nextStoredCampaign);
+  cacheCampaign(savedCampaign || nextStoredCampaign);
+
+  logEvent("campaign_channel_approved", {
+    requestId,
+    campaignId: existing.campaignId,
+    channel
+  });
 
   res.json({
     requestId,
@@ -729,40 +797,46 @@ router.post("/approve", async (req, res, next) => {
 
 router.post("/deploy", async (req, res, next) => {
   try {
-  const requestId = req.body?.requestId;
+  const requestId = requireNonEmptyString(req.body?.requestId, "requestId");
+  assertUnlocked([`generate:${requestId}`, `pipeline:${requestId}`]);
   const approvals = getApprovals(requestId);
   const approvedChannels = Object.entries(approvals)
     .filter(([, approved]) => approved)
     .map(([channel]) => channel);
-
-  if (!requestId || typeof requestId !== "string") {
-    return res.status(400).json({ error: 'Request body must include "requestId".' });
-  }
-
   if (!approvedChannels.length) {
-    return res.status(400).json({ error: "Approve at least one channel before deployment." });
+    throw badRequest("Approve at least one channel before deployment.");
   }
-
-  const deployment = {
-    deployed: true,
-    deployedAt: new Date().toISOString(),
-    deployedChannels: approvedChannels
-  };
-
-  deploymentStore.set(requestId, deployment);
 
   const existing = await getStoredResult(requestId);
+  if (!existing) {
+    throw notFound("Campaign not found.");
+  }
 
-  if (existing) {
+  const deployment = await withActionLock(`deploy:${requestId}`, async () => {
+    const nextDeployment = {
+      deployed: true,
+      deployedAt: new Date().toISOString(),
+      deployedChannels: approvedChannels
+    };
+
+    deploymentStore.set(requestId, nextDeployment);
+
     const nextStoredCampaign = {
       ...existing,
-      deployment,
+      deployment: nextDeployment,
       reviewStatus: existing.reviewStatus || existing.status
     };
 
     const savedCampaign = await saveCampaign(nextStoredCampaign);
     cacheCampaign(savedCampaign || nextStoredCampaign);
-  }
+    return nextDeployment;
+  });
+
+  logEvent("campaign_deployed", {
+    requestId,
+    campaignId: existing.campaignId,
+    channels: approvedChannels
+  });
 
   res.json({
     requestId,

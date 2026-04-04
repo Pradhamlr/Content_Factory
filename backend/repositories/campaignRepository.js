@@ -201,4 +201,20 @@ export async function listCampaigns(limit = 12) {
   return rows.map((row) => buildCampaignSummary(normalizeCampaignRow(row)));
 }
 
+export async function deleteCampaignById(campaignId) {
+  if (!isDatabaseConfigured || !pool || !campaignId) {
+    return false;
+  }
+
+  const { rowCount } = await pool.query(
+    `
+      DELETE FROM campaigns
+      WHERE campaign_id = $1;
+    `,
+    [campaignId]
+  );
+
+  return rowCount > 0;
+}
+
 export { buildCampaignSummary };

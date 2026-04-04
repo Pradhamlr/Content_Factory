@@ -1,6 +1,7 @@
 import { Router } from "express";
-import { getCampaignById, listCampaigns } from "../repositories/campaignRepository.js";
+import { deleteCampaignById, getCampaignById, listCampaigns } from "../repositories/campaignRepository.js";
 import { buildArtifactFile, buildArtifactMetadata, buildCampaignZip } from "../utils/artifacts.js";
+import { notFound } from "../utils/errors.js";
 
 const router = Router();
 
@@ -78,6 +79,23 @@ router.get("/:campaignId/export", async (req, res, next) => {
     res.setHeader("Content-Type", "application/zip");
     res.setHeader("Content-Disposition", `attachment; filename="campaign-kit-${campaign.campaignId}.zip"`);
     res.send(zipBuffer);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.delete("/:campaignId", async (req, res, next) => {
+  try {
+    const deleted = await deleteCampaignById(req.params.campaignId);
+
+    if (!deleted) {
+      throw notFound("Campaign not found.");
+    }
+
+    res.json({
+      campaignId: req.params.campaignId,
+      deleted: true
+    });
   } catch (error) {
     next(error);
   }

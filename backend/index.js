@@ -6,6 +6,8 @@ import { fileURLToPath } from "url";
 import { MODEL } from "./config/groq.js";
 import { isDatabaseConfigured } from "./config/database.js";
 import { ensureCampaignSchema } from "./repositories/campaignRepository.js";
+import { toErrorResponse } from "./utils/errors.js";
+import { logEvent } from "./utils/logger.js";
 import { logFilePath } from "./utils/agentLogger.js";
 import campaignsRouter from "./routes/campaigns.js";
 import generateRouter from "./routes/generate.js";
@@ -30,14 +32,32 @@ app.use("/api/generate", generateRouter);
 app.use("/api/campaigns", campaignsRouter);
 
 app.use((req, res) => {
-  res.status(404).json({ error: "Route not found" });
+  res.status(404).json({
+    error: "Route not found",
+    code: "NOT_FOUND",
+    details: null
+  });
 });
 
 app.use((err, req, res, next) => {
-  console.error(err);
-  res.status(err.statusCode || 500).json({
-    error: err.message || "Internal server error"
+  const isMulterSizeError = err?.code === "LIMIT_FILE_SIZE";
+  const normalizedError = isMulterSizeError
+    ? {
+        message: "Uploaded file is too large. Please use a PDF under 10MB.",
+        code: "FILE_TOO_LARGE",
+        statusCode: 400,
+        details: { limitMb: 10 }
+      }
+    : err;
+
+  logEvent("api_error", {
+    path: req.path,
+    method: req.method,
+    code: normalizedError?.code || "INTERNAL_ERROR",
+    message: normalizedError?.message || "Internal server error"
   });
+
+  res.status(normalizedError?.statusCode || 500).json(toErrorResponse(normalizedError));
 });
 
 async function startServer() {
