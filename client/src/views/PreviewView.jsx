@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { buildApiUrl } from "../lib/api";
 
 function toHeadlineCase(value) {
   return String(value || "")
@@ -169,11 +170,11 @@ export default function PreviewView({
   const previewVersion = result?.updatedAt || result?.telemetry?.requestCompletedAt || result?.requestId || "preview";
   const backendDesktopImageUrl =
     hasCampaign && result?.requestId
-      ? `/api/generate/preview-image?requestId=${encodeURIComponent(result.requestId)}&variant=desktop&v=${encodeURIComponent(previewVersion)}`
+      ? buildApiUrl(`/api/generate/preview-image?requestId=${encodeURIComponent(result.requestId)}&variant=desktop&v=${encodeURIComponent(previewVersion)}`)
       : "";
   const backendMobileImageUrl =
     hasCampaign && result?.requestId
-      ? `/api/generate/preview-image?requestId=${encodeURIComponent(result.requestId)}&variant=mobile&v=${encodeURIComponent(previewVersion)}`
+      ? buildApiUrl(`/api/generate/preview-image?requestId=${encodeURIComponent(result.requestId)}&variant=mobile&v=${encodeURIComponent(previewVersion)}`)
       : "";
   const blogExcerpt = getBlogExcerpt(blog);
   const fallbackSeed = `${blogTitle}|${firstTweet}|${email}|${result?.facts?.valueProposition || ""}`;
@@ -208,7 +209,7 @@ export default function PreviewView({
     async function checkStatus(variant) {
       try {
         const response = await fetch(
-          `/api/generate/preview-image-status?requestId=${encodeURIComponent(result.requestId)}&variant=${variant}`,
+          buildApiUrl(`/api/generate/preview-image-status?requestId=${encodeURIComponent(result.requestId)}&variant=${variant}`),
           {
             headers: {
               Accept: "application/json"

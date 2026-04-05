@@ -1,5 +1,23 @@
+const API_BASE_URL = String(import.meta.env.VITE_API_BASE_URL || "").replace(/\/+$/, "");
+
+export function buildApiUrl(path) {
+  if (!path) {
+    return API_BASE_URL || "";
+  }
+
+  if (/^https?:\/\//i.test(path)) {
+    return path;
+  }
+
+  if (!API_BASE_URL) {
+    return path;
+  }
+
+  return `${API_BASE_URL}${path.startsWith("/") ? path : `/${path}`}`;
+}
+
 export async function api(path, options = {}) {
-  const response = await fetch(path, {
+  const response = await fetch(buildApiUrl(path), {
     headers: { "Content-Type": "application/json" },
     ...options
   });
@@ -14,7 +32,7 @@ export async function api(path, options = {}) {
 }
 
 export async function apiForm(path, formData, options = {}) {
-  const response = await fetch(path, {
+  const response = await fetch(buildApiUrl(path), {
     method: "POST",
     body: formData,
     ...options
@@ -30,7 +48,7 @@ export async function apiForm(path, formData, options = {}) {
 }
 
 export async function downloadFromApi(path, filename) {
-  const response = await fetch(path);
+  const response = await fetch(buildApiUrl(path));
 
   if (!response.ok) {
     const payload = await response.json().catch(() => null);

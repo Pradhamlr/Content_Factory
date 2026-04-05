@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import AppSidebar from "./components/AppSidebar";
 import AppTopbar from "./components/AppTopbar";
 import AppToast from "./components/AppToast";
-import { api, apiForm, buildCampaignKitFile, buildExportFile, downloadFromApi } from "./lib/api";
+import { api, apiForm, buildApiUrl, buildCampaignKitFile, buildExportFile, downloadFromApi } from "./lib/api";
 import CampaignsView from "./views/CampaignsView";
 import AgentsView from "./views/AgentsView";
 import PlaceholderView from "./views/PlaceholderView";
@@ -153,7 +153,7 @@ export default function App() {
 
   function connectStream(nextRequestId) {
     eventSourceRef.current?.close();
-    const eventSource = new EventSource(`/api/generate/stream?requestId=${nextRequestId}`);
+    const eventSource = new EventSource(buildApiUrl(`/api/generate/stream?requestId=${encodeURIComponent(nextRequestId)}`));
     eventSourceRef.current = eventSource;
 
     eventSource.addEventListener("connected", (event) => {
