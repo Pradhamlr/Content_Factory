@@ -401,18 +401,21 @@ export default function App() {
       return;
     }
 
+    const channelLabel = channel === "tweets" ? "Social Thread" : channel === "email" ? "Email Teaser" : "Blog Post";
     setReviewActionLoading(true);
     setError("");
+    setActiveView("agents");
     setReviewActionState({
       type: "regenerate",
       channel,
       status: "running",
-      message: `Regenerating ${channel === "tweets" ? "Social Thread" : channel === "email" ? "Email Teaser" : "Blog Post"} only. The other two channels stay intact while the Gatekeeper re-reviews this asset.`
+      message: `Regenerating ${channelLabel} only. The other two channels stay intact while the Gatekeeper re-reviews this asset.`
     });
     appendLog(
-      `Targeted regeneration started for ${channel === "tweets" ? "Social Thread" : channel === "email" ? "Email Teaser" : "Blog Post"}. Other channels are being preserved.`,
+      `Targeted regeneration started for ${channelLabel}. Other channels are being preserved.`,
       "system"
     );
+    showToast(`${channelLabel} regeneration is running in the Agent Room.`, "info", 3400, "hub");
     setAgentStages((current) => ({
       ...current,
       researcher: { ...current.researcher, status: result?.facts ? "complete" : current.researcher.status },
@@ -450,26 +453,26 @@ export default function App() {
         status: payload.reviewStatus === "APPROVED" ? "approved" : "rejected",
         message:
           payload.reviewStatus === "APPROVED"
-            ? `${channel === "tweets" ? "Social Thread" : channel === "email" ? "Email Teaser" : "Blog Post"} was regenerated and approved. The other channels were preserved.`
+            ? `${channelLabel} was regenerated and approved. The other channels were preserved.`
             : payload.preservedPrevious
-            ? `${channel === "tweets" ? "Social Thread" : channel === "email" ? "Email Teaser" : "Blog Post"} regeneration was rejected, so the last approved version was kept and the rest of the campaign remains approved.`
-            : `${channel === "tweets" ? "Social Thread" : channel === "email" ? "Email Teaser" : "Blog Post"} was regenerated but rejected by the Gatekeeper. The other channels were preserved.`
+            ? `${channelLabel} regeneration was rejected, so the last approved version was kept and the rest of the campaign remains approved.`
+            : `${channelLabel} was regenerated but rejected by the Gatekeeper. The other channels were preserved.`
       });
       showToast(
         payload.reviewStatus === "APPROVED"
-          ? `${channel === "tweets" ? "Social Thread" : channel === "email" ? "Email Teaser" : "Blog Post"} approved after regeneration.`
+          ? `${channelLabel} approved after regeneration. Review the updated content in Content Library.`
           : payload.preservedPrevious
-          ? `${channel === "tweets" ? "Social Thread" : channel === "email" ? "Email Teaser" : "Blog Post"} rewrite was rejected, so the previous approved version was kept.`
-          : `${channel === "tweets" ? "Social Thread" : channel === "email" ? "Email Teaser" : "Blog Post"} regeneration was rejected.`,
+          ? `${channelLabel} rewrite was rejected, so the previous approved version was kept.`
+          : `${channelLabel} regeneration was rejected. Review the Gatekeeper flow for details.`,
         payload.reviewStatus === "APPROVED" ? "approved" : payload.preservedPrevious ? "warning" : "rejected",
         4800
       );
       appendLog(
         payload.reviewStatus === "APPROVED"
-          ? `Targeted regeneration approved for ${channel === "tweets" ? "Social Thread" : channel === "email" ? "Email Teaser" : "Blog Post"}.`
+          ? `Targeted regeneration approved for ${channelLabel}.`
           : payload.preservedPrevious
-          ? `Targeted regeneration was rejected for ${channel === "tweets" ? "Social Thread" : channel === "email" ? "Email Teaser" : "Blog Post"}, so the previous approved version was retained.`
-          : `Targeted regeneration rejected for ${channel === "tweets" ? "Social Thread" : channel === "email" ? "Email Teaser" : "Blog Post"}.`,
+          ? `Targeted regeneration was rejected for ${channelLabel}, so the previous approved version was retained.`
+          : `Targeted regeneration rejected for ${channelLabel}.`,
         "system"
       );
       setAgentStages((current) => ({
@@ -774,6 +777,7 @@ export default function App() {
               result={result}
               hasCampaign={hasCampaign}
               deployment={deployment}
+              reviewActionState={reviewActionState}
               onArtifactOpen={handleArtifactOpen}
               onSubmitOperatorInput={handleOperatorInput}
             />

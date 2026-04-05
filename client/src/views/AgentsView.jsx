@@ -177,7 +177,7 @@ function AgentCard({ title, status, active, complete, blocked, accent }) {
   );
 }
 
-export default function AgentsView({ liveLogs, agentStages, loading, result, hasCampaign, deployment, onArtifactOpen, onSubmitOperatorInput }) {
+export default function AgentsView({ liveLogs, agentStages, loading, result, hasCampaign, deployment, reviewActionState, onArtifactOpen, onSubmitOperatorInput }) {
   const [operatorInput, setOperatorInput] = useState("");
   const logs = liveLogs.length
     ? liveLogs
@@ -226,6 +226,13 @@ export default function AgentsView({ liveLogs, agentStages, loading, result, has
   const researcherStatus = agentStages.researcher.status;
   const writerStatus = agentStages.writer.status;
   const editorStatus = agentStages.editor.status;
+  const activeOperationLabel = reviewActionState?.channel
+    ? reviewActionState.channel === "tweets"
+      ? "Social Thread"
+      : reviewActionState.channel === "email"
+      ? "Email Teaser"
+      : "Blog Post"
+    : null;
 
   return (
     <div className="war-room-page">
@@ -272,6 +279,51 @@ export default function AgentsView({ liveLogs, agentStages, loading, result, has
           <span className="material-symbols-outlined">east</span>
           <span>Refine</span>
         </div>
+
+        {hasCampaign && (reviewActionState || pendingGuidance || lastAppliedGuidance) ? (
+          <section className="war-room-operation">
+            <div className="war-room-operation__head">
+              <div>
+                <div className="war-room-operation__eyebrow">Operator Context</div>
+                <h3>
+                  {reviewActionState?.status === "running"
+                    ? `Regenerating ${activeOperationLabel || "selected channel"}`
+                    : reviewActionState?.status === "approved"
+                    ? `${activeOperationLabel || "Channel"} updated successfully`
+                    : reviewActionState?.status === "rejected"
+                    ? `${activeOperationLabel || "Channel"} rewrite reviewed`
+                    : pendingGuidance
+                    ? "Guidance queued for the next rewrite"
+                    : "Pipeline ready for operator input"}
+                </h3>
+              </div>
+              {reviewActionState?.status ? (
+                <span className={`war-room-operation__status is-${reviewActionState.status}`}>
+                  {reviewActionState.status === "running"
+                    ? "IN PROGRESS"
+                    : reviewActionState.status === "approved"
+                    ? "APPROVED"
+                    : reviewActionState.status === "rejected"
+                    ? "REVIEWED"
+                    : "READY"}
+                </span>
+              ) : null}
+            </div>
+
+            <p className="war-room-operation__summary">
+              {reviewActionState?.message ||
+                (pendingGuidance
+                  ? "Your latest guidance is saved and will be applied the next time you regenerate a specific channel."
+                  : "Use the guidance field below to steer the next draft or targeted rewrite.")}
+            </p>
+
+            <div className="war-room-operation__chips">
+              {pendingGuidance ? <span className="is-pending">Pending guidance queued</span> : null}
+              {lastAppliedGuidance ? <span className="is-applied">Last guidance applied</span> : null}
+              {reviewActionState?.channel ? <span>{activeOperationLabel} in focus</span> : null}
+            </div>
+          </section>
+        ) : null}
 
         <section className="war-room-stream">
           <div className="war-room-stream__head">
@@ -350,7 +402,7 @@ export default function AgentsView({ liveLogs, agentStages, loading, result, has
             </div>
           ) : null}
 
-          {latestOperatorNote ? (
+          {latestOperatorNote && !pendingGuidance && !lastAppliedGuidance ? (
             <div className="war-room-stream__operator-note">
               <span className="material-symbols-outlined">rule</span>
               <div>
