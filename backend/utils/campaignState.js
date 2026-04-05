@@ -104,7 +104,9 @@ export function buildCampaignState({
   deployment,
   telemetry = {},
   revisionHistory,
-  manualInstructions = []
+  manualInstructions = [],
+  pendingGuidance = null,
+  lastAppliedGuidance = null
 }) {
   return {
     campaignId: campaignId || requestId,
@@ -127,6 +129,8 @@ export function buildCampaignState({
     },
     telemetry,
     revisionHistory: normalizeRevisionHistory(revisionHistory),
-    manualInstructions: normalizeManualInstructions(manualInstructions)
+    manualInstructions: normalizeManualInstructions(manualInstructions),
+    pendingGuidance: pendingGuidance && typeof pendingGuidance === "object" && pendingGuidance.message ? pendingGuidance : null,
+    lastAppliedGuidance: lastAppliedGuidance && typeof lastAppliedGuidance === "object" && lastAppliedGuidance.message ? lastAppliedGuidance : null
   };
 }

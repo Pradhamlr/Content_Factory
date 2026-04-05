@@ -19,7 +19,9 @@ function normalizeCampaignRow(row) {
     deployment: row.deployment,
     telemetry: row.telemetry,
     revisionHistory: row.revision_history,
-    manualInstructions: row.manual_instructions
+    manualInstructions: row.manual_instructions,
+    pendingGuidance: row.pending_guidance,
+    lastAppliedGuidance: row.last_applied_guidance
   });
 
   payload.feedback = row.feedback || "";
@@ -73,6 +75,8 @@ export async function ensureCampaignSchema() {
       telemetry JSONB NOT NULL DEFAULT '{}'::jsonb,
       revision_history JSONB NOT NULL DEFAULT '{}'::jsonb,
       manual_instructions JSONB NOT NULL DEFAULT '[]'::jsonb,
+      pending_guidance JSONB,
+      last_applied_guidance JSONB,
       feedback TEXT NOT NULL DEFAULT '',
       attempts INTEGER NOT NULL DEFAULT 0,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -93,6 +97,16 @@ export async function ensureCampaignSchema() {
   await pool.query(`
     ALTER TABLE campaigns
     ADD COLUMN IF NOT EXISTS manual_instructions JSONB NOT NULL DEFAULT '[]'::jsonb;
+  `);
+
+  await pool.query(`
+    ALTER TABLE campaigns
+    ADD COLUMN IF NOT EXISTS pending_guidance JSONB;
+  `);
+
+  await pool.query(`
+    ALTER TABLE campaigns
+    ADD COLUMN IF NOT EXISTS last_applied_guidance JSONB;
   `);
 
   return true;
@@ -118,12 +132,14 @@ export async function saveCampaign(payload) {
       telemetry,
       revision_history,
       manual_instructions,
+      pending_guidance,
+      last_applied_guidance,
       feedback,
       attempts,
       created_at,
       updated_at
     ) VALUES (
-      $1, $2, $3::jsonb, $4::jsonb, $5::jsonb, $6, $7, $8::jsonb, $9::jsonb, $10::jsonb, $11::jsonb, $12::jsonb, $13::jsonb, $14, $15, NOW(), NOW()
+      $1, $2, $3::jsonb, $4::jsonb, $5::jsonb, $6, $7, $8::jsonb, $9::jsonb, $10::jsonb, $11::jsonb, $12::jsonb, $13::jsonb, $14::jsonb, $15::jsonb, $16, $17, NOW(), NOW()
     )
     ON CONFLICT (campaign_id) DO UPDATE SET
       request_id = EXCLUDED.request_id,
@@ -138,6 +154,8 @@ export async function saveCampaign(payload) {
       telemetry = EXCLUDED.telemetry,
       revision_history = EXCLUDED.revision_history,
       manual_instructions = EXCLUDED.manual_instructions,
+      pending_guidance = EXCLUDED.pending_guidance,
+      last_applied_guidance = EXCLUDED.last_applied_guidance,
       feedback = EXCLUDED.feedback,
       attempts = EXCLUDED.attempts,
       updated_at = NOW()
@@ -158,6 +176,8 @@ export async function saveCampaign(payload) {
     JSON.stringify(payload.telemetry || {}),
     JSON.stringify(payload.revisionHistory || {}),
     JSON.stringify(payload.manualInstructions || []),
+    payload.pendingGuidance ? JSON.stringify(payload.pendingGuidance) : null,
+    payload.lastAppliedGuidance ? JSON.stringify(payload.lastAppliedGuidance) : null,
     payload.feedback || "",
     payload.attempts || 0
   ];

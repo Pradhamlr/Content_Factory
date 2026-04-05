@@ -211,9 +211,17 @@ export default function AgentsView({ liveLogs, agentStages, loading, result, has
     channels: Array.isArray(deployment?.deployedChannels) ? deployment.deployedChannels : [],
     deployedAt: deployment?.deployedAt || null
   };
-  const latestOperatorNote = Array.isArray(result?.manualInstructions) && result.manualInstructions.length
+  const pendingGuidance = result?.pendingGuidance || null;
+  const lastAppliedGuidance = result?.lastAppliedGuidance || null;
+  const rawLatestOperatorNote = Array.isArray(result?.manualInstructions) && result.manualInstructions.length
     ? result.manualInstructions[result.manualInstructions.length - 1]
     : null;
+  const latestOperatorNote =
+    rawLatestOperatorNote &&
+    rawLatestOperatorNote.id !== pendingGuidance?.id &&
+    rawLatestOperatorNote.id !== lastAppliedGuidance?.id
+      ? rawLatestOperatorNote
+      : null;
 
   const researcherStatus = agentStages.researcher.status;
   const writerStatus = agentStages.writer.status;
@@ -295,12 +303,12 @@ export default function AgentsView({ liveLogs, agentStages, loading, result, has
           </div>
 
           <div className="war-room-stream__input">
-            <span className="war-room-stream__input-label">OVERRIDE CMD:</span>
+            <span className="war-room-stream__input-label">{loading ? "LIVE GUIDANCE:" : "REVISION GUIDANCE:"}</span>
             <input
               className="war-room-stream__input-field"
               value={operatorInput}
               onChange={(event) => setOperatorInput(event.target.value)}
-              placeholder="ENTER SYSTEM OVERRIDE OR FEEDBACK..."
+              placeholder={loading ? "ENTER LIVE OPERATOR GUIDANCE..." : "QUEUE GUIDANCE FOR THE NEXT TARGETED REWRITE..."}
             />
             <button
               type="button"
@@ -321,6 +329,26 @@ export default function AgentsView({ liveLogs, agentStages, loading, result, has
               <span className="material-symbols-outlined">terminal</span>
             </button>
           </div>
+
+          {pendingGuidance ? (
+            <div className="war-room-stream__operator-note is-pending">
+              <span className="material-symbols-outlined">schedule</span>
+              <div>
+                <strong>Pending revision guidance</strong>
+                <p>{pendingGuidance.message}</p>
+              </div>
+            </div>
+          ) : null}
+
+          {lastAppliedGuidance ? (
+            <div className="war-room-stream__operator-note is-applied">
+              <span className="material-symbols-outlined">check_circle</span>
+              <div>
+                <strong>Last applied guidance</strong>
+                <p>{lastAppliedGuidance.message}</p>
+              </div>
+            </div>
+          ) : null}
 
           {latestOperatorNote ? (
             <div className="war-room-stream__operator-note">

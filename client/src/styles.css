@@ -1696,6 +1696,32 @@ textarea:focus-visible {
   line-height: 1.55;
 }
 
+.war-room-stream__operator-note.is-pending {
+  background: rgba(250, 204, 21, 0.07);
+  border-color: rgba(250, 204, 21, 0.16);
+}
+
+.war-room-stream__operator-note.is-pending .material-symbols-outlined {
+  color: #facc15;
+}
+
+.war-room-stream__operator-note.is-pending strong {
+  color: #fde68a;
+}
+
+.war-room-stream__operator-note.is-applied {
+  background: rgba(155, 240, 0, 0.06);
+  border-color: rgba(155, 240, 0, 0.16);
+}
+
+.war-room-stream__operator-note.is-applied .material-symbols-outlined {
+  color: #9bf000;
+}
+
+.war-room-stream__operator-note.is-applied strong {
+  color: #d4ff91;
+}
+
 .war-room-sidebar {
   display: flex;
   flex-direction: column;

@@ -4,7 +4,7 @@ import multer from "multer";
 import { researcherAgent } from "../agents/researcher.js";
 import { writerAgent } from "../agents/writer.js";
 import { editorAgent } from "../agents/editor.js";
-import { assertUnlocked, withActionLock } from "../utils/actionLocks.js";
+import { assertUnlocked, isLocked, withActionLock } from "../utils/actionLocks.js";
 import { addStream, publish, removeStream } from "../utils/requestEvents.js";
 import { delay } from "../utils/delay.js";
 import { mergeCampaignContent, normalizeCampaignContent } from "../utils/contentShape.js";
@@ -24,7 +24,11 @@ import { extractUrlText } from "../utils/urlExtractor.js";
 
 const router = Router();
 const MAX_RETRIES = 2;
-const UX_DELAY_MS = 900;
+const STREAM_BOOT_DELAY_MS = 700;
+const STAGE_TRANSITION_DELAY_MS = 1600;
+const ATTEMPT_START_DELAY_MS = 900;
+const RETRY_FEEDBACK_DELAY_MS = 1200;
+const REGENERATE_REVIEW_DELAY_MS = 1800;
 const AGENT_RETRY_LIMIT = 2;
 const AGENT_TIMEOUT_MS = 45000;
 const upload = multer({
@@ -39,6 +43,8 @@ const deploymentStore = new Map();
 const resultStore = new Map();
 const requestToCampaignStore = new Map();
 const instructionStore = new Map();
+const pendingGuidanceStore = new Map();
+const lastAppliedGuidanceStore = new Map();
 
 function createDefaultApprovals() {
   return {
@@ -77,6 +83,8 @@ function cacheCampaign(payload) {
   approvalMetaStore.set(payload.requestId, payload.approvalMeta || createEmptyApprovalMeta());
   deploymentStore.set(payload.requestId, payload.deployment || createDefaultDeployment());
   instructionStore.set(payload.requestId, Array.isArray(payload.manualInstructions) ? payload.manualInstructions : []);
+  pendingGuidanceStore.set(payload.requestId, payload.pendingGuidance || null);
+  lastAppliedGuidanceStore.set(payload.requestId, payload.lastAppliedGuidance || null);
 
   return payload;
 }
@@ -92,6 +100,8 @@ function removeCachedCampaign(payload) {
     approvalMetaStore.delete(payload.requestId);
     deploymentStore.delete(payload.requestId);
     instructionStore.delete(payload.requestId);
+    pendingGuidanceStore.delete(payload.requestId);
+    lastAppliedGuidanceStore.delete(payload.requestId);
   }
 
   if (payload.campaignId) {
@@ -159,7 +169,7 @@ async function runWithRecovery(taskName, requestId, runner) {
         message: `${taskName} hit a formatting issue. Recovering automatically (${attempt}/${AGENT_RETRY_LIMIT}).`
       });
 
-      await delay(700);
+      await delay(RETRY_FEEDBACK_DELAY_MS);
     }
   }
 
@@ -221,6 +231,28 @@ function getManualInstructions(requestId) {
 function getLatestOperatorGuidance(requestId) {
   const instructions = getManualInstructions(requestId);
   return instructions.length ? instructions[instructions.length - 1].message : "";
+}
+
+function getLatestOperatorInstruction(requestId) {
+  const instructions = getManualInstructions(requestId);
+  return instructions.length ? instructions[instructions.length - 1] : null;
+}
+
+function getPendingGuidance(requestId) {
+  return pendingGuidanceStore.get(requestId) || null;
+}
+
+function getLastAppliedGuidance(requestId) {
+  return lastAppliedGuidanceStore.get(requestId) || null;
+}
+
+function isCampaignProcessing(requestId) {
+  return (
+    isLocked(`generate:${requestId}`) ||
+    isLocked(`regenerate:${requestId}:blog`) ||
+    isLocked(`regenerate:${requestId}:tweets`) ||
+    isLocked(`regenerate:${requestId}:email`)
+  );
 }
 
 async function getStoredResult(requestId) {
@@ -387,7 +419,7 @@ async function runCampaignPipeline(input, requestId, source = createSourceDescri
     status: "started",
     message: "Campaign generation started."
   });
-  await delay(500);
+  await delay(STREAM_BOOT_DELAY_MS);
 
   const stageTimings = {
     researcherMs: 0,
@@ -398,7 +430,7 @@ async function runCampaignPipeline(input, requestId, source = createSourceDescri
   const researcherStartedAt = startTimer();
   const facts = await runWithRecovery("Researcher", requestId, () => researcherAgent(input.trim(), { requestId }));
   stageTimings.researcherMs = endTimer(researcherStartedAt);
-  await delay(UX_DELAY_MS);
+  await delay(STAGE_TRANSITION_DELAY_MS);
 
   let attempts = 0;
   let feedback = "";
@@ -412,7 +444,7 @@ async function runCampaignPipeline(input, requestId, source = createSourceDescri
       attempt: attempts,
       message: `Writer attempt ${attempts} started.`
     });
-    await delay(500);
+    await delay(ATTEMPT_START_DELAY_MS);
 
     const writerStartedAt = startTimer();
     const operatorGuidance = getLatestOperatorGuidance(requestId);
@@ -427,7 +459,7 @@ async function runCampaignPipeline(input, requestId, source = createSourceDescri
       writerAgent(facts, feedback, { requestId, operatorGuidance })
     );
     stageTimings.writerMs += endTimer(writerStartedAt);
-    await delay(UX_DELAY_MS);
+    await delay(STAGE_TRANSITION_DELAY_MS);
 
     const editorStartedAt = startTimer();
     const review = await runWithRecovery("Editor", requestId, () =>
@@ -440,7 +472,7 @@ async function runCampaignPipeline(input, requestId, source = createSourceDescri
       })
     );
     stageTimings.editorMs += endTimer(editorStartedAt);
-    await delay(UX_DELAY_MS);
+    await delay(STAGE_TRANSITION_DELAY_MS);
 
     finalContent = review.status === "APPROVED" ? mergeCampaignContent(review.content, draft) : mergeCampaignContent(draft, {});
     finalReview = review;
@@ -450,7 +482,7 @@ async function runCampaignPipeline(input, requestId, source = createSourceDescri
     }
 
     feedback = review.feedback || "Please improve clarity and align strictly with the facts.";
-    await delay(700);
+    await delay(RETRY_FEEDBACK_DELAY_MS);
   }
 
   publish(requestId, "complete", {
@@ -487,6 +519,8 @@ async function runCampaignPipeline(input, requestId, source = createSourceDescri
   payload.attempts = attempts;
   payload.feedback = finalReview?.feedback || "";
   payload.manualInstructions = getManualInstructions(requestId);
+  payload.pendingGuidance = getPendingGuidance(requestId);
+  payload.lastAppliedGuidance = getLastAppliedGuidance(requestId);
 
   const savedPayload = await saveCampaign(payload);
   cacheCampaign(savedPayload || payload);
@@ -752,9 +786,24 @@ router.post("/regenerate", async (req, res, next) => {
         : `Regenerate only the ${channelLabel}. Keep every claim grounded in the provided facts and improve specificity, clarity, and structure for this one asset.`;
 
     const { payload, nextStoredCampaign } = await withActionLock(`regenerate:${requestId}:${channel}`, async () => {
-      const operatorGuidance = getLatestOperatorGuidance(requestId);
+      const pendingGuidance = getPendingGuidance(requestId);
+      const operatorGuidance = pendingGuidance?.message || getLatestOperatorGuidance(requestId);
+      const appliedGuidance = pendingGuidance || (operatorGuidance ? getLatestOperatorInstruction(requestId) : null);
+      publish(requestId, "attempt", {
+        requestId,
+        attempt: "regenerate",
+        message: `Targeted ${channelLabel} rewrite started. The Gatekeeper will review only this channel while the other approved assets stay intact.`
+      });
+      if (pendingGuidance) {
+        publish(requestId, "attempt", {
+          requestId,
+          attempt: "regenerate",
+          message: "Pending operator guidance is being applied to this targeted rewrite."
+        });
+      }
+      await delay(ATTEMPT_START_DELAY_MS);
       const draft = await runWithRecovery("Writer", requestId, () => writerAgent(facts, feedback, { requestId, operatorGuidance }));
-      await delay(UX_DELAY_MS);
+      await delay(REGENERATE_REVIEW_DELAY_MS);
       const review = await runWithRecovery("Editor", requestId, () =>
         editorAgent(draft, facts, {
           requestId,
@@ -793,6 +842,8 @@ router.post("/regenerate", async (req, res, next) => {
 
       approvalStore.set(requestId, nextApprovals);
       approvalMetaStore.set(requestId, nextApprovalMeta);
+      pendingGuidanceStore.set(requestId, null);
+      lastAppliedGuidanceStore.set(requestId, appliedGuidance);
 
       const payload = {
         campaignId: existing?.campaignId || requestId,
@@ -823,7 +874,9 @@ router.post("/regenerate", async (req, res, next) => {
           feedback: review.feedback || "",
           content: reviewedContent
         }),
-        manualInstructions: getManualInstructions(requestId)
+        manualInstructions: getManualInstructions(requestId),
+        pendingGuidance: null,
+        lastAppliedGuidance: appliedGuidance
       };
 
       const nextStoredCampaign = {
@@ -837,7 +890,9 @@ router.post("/regenerate", async (req, res, next) => {
         deployment: previousDeployment,
         telemetry: payload.telemetry,
         revisionHistory: payload.revisionHistory,
-        manualInstructions: payload.manualInstructions
+        manualInstructions: payload.manualInstructions,
+        pendingGuidance: payload.pendingGuidance,
+        lastAppliedGuidance: payload.lastAppliedGuidance
       };
 
       return { payload, nextStoredCampaign };
@@ -986,14 +1041,18 @@ router.post("/operator-input", async (req, res, next) => {
     const message = requireNonEmptyString(req.body?.message, "message");
     const nextInstruction = createOperatorInstruction(message);
     const instructions = [...getManualInstructions(requestId), nextInstruction];
+    const processing = isCampaignProcessing(requestId);
 
     instructionStore.set(requestId, instructions);
+    pendingGuidanceStore.set(requestId, processing ? getPendingGuidance(requestId) : nextInstruction);
 
     const existing = await getStoredResult(requestId);
     if (existing) {
       const nextStoredCampaign = {
         ...existing,
-        manualInstructions: instructions
+        manualInstructions: instructions,
+        pendingGuidance: processing ? existing.pendingGuidance || null : nextInstruction,
+        lastAppliedGuidance: existing.lastAppliedGuidance || getLastAppliedGuidance(requestId)
       };
       const savedCampaign = await saveCampaign(nextStoredCampaign);
       cacheCampaign(savedCampaign || nextStoredCampaign);
@@ -1002,7 +1061,9 @@ router.post("/operator-input", async (req, res, next) => {
     publish(requestId, "attempt", {
       requestId,
       attempt: "operator",
-      message: "Operator guidance received and queued for the next draft or review cycle."
+      message: processing
+        ? "Operator guidance received and queued for the next draft or review cycle."
+        : "Operator guidance saved as pending revision guidance for the next targeted rewrite."
     });
 
     logEvent("campaign_operator_input", {
@@ -1012,7 +1073,9 @@ router.post("/operator-input", async (req, res, next) => {
 
     res.json({
       requestId,
-      manualInstructions: instructions
+      manualInstructions: instructions,
+      pendingGuidance: processing ? getPendingGuidance(requestId) : nextInstruction,
+      lastAppliedGuidance: getLastAppliedGuidance(requestId)
     });
   } catch (error) {
     next(error);

@@ -439,6 +439,8 @@ export default function App() {
         reviewStatus: payload.reviewStatus || current?.reviewStatus || current?.status,
         approvalMeta: payload.approvalMeta || current?.approvalMeta,
         manualInstructions: payload.manualInstructions || current?.manualInstructions,
+        pendingGuidance: payload.pendingGuidance ?? current?.pendingGuidance ?? null,
+        lastAppliedGuidance: payload.lastAppliedGuidance ?? current?.lastAppliedGuidance ?? null,
         revisionHistory: payload.revisionHistory || current?.revisionHistory,
         telemetry: payload.telemetry || current?.telemetry
       }));
@@ -638,12 +640,21 @@ export default function App() {
         current
           ? {
               ...current,
-              manualInstructions: payload.manualInstructions || current.manualInstructions
+              manualInstructions: payload.manualInstructions || current.manualInstructions,
+              pendingGuidance: payload.pendingGuidance ?? current.pendingGuidance ?? null,
+              lastAppliedGuidance: payload.lastAppliedGuidance ?? current.lastAppliedGuidance ?? null
             }
           : current
       );
       appendLog(`Operator guidance received: ${message.trim()}`, "system");
-      showToast("Operator guidance queued for the next draft/review cycle.", "approved", 3400, "terminal");
+      showToast(
+        payload.pendingGuidance
+          ? "Operator guidance saved for the next targeted rewrite."
+          : "Operator guidance queued for the next draft/review cycle.",
+        "approved",
+        3400,
+        "terminal"
+      );
     } catch (nextError) {
       setError(nextError.message);
       showToast(nextError.message, "error", 5600, "warning");
