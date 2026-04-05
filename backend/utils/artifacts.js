@@ -78,8 +78,27 @@ function buildCampaignManifest(campaign) {
   });
 }
 
+function getPreviewAsset(campaign, variant) {
+  return campaign?.previewAssets?.[variant] || null;
+}
+
+function getPreviewArtifactTitle(campaign, variant) {
+  const asset = getPreviewAsset(campaign, variant);
+  const contentType = String(asset?.contentType || "").toLowerCase();
+
+  if (contentType.includes("svg")) {
+    return variant === "mobile" ? "Social_Preview.svg" : "Desktop_Hero.svg";
+  }
+
+  if (contentType.includes("png")) {
+    return variant === "mobile" ? "Social_Preview.png" : "Desktop_Hero.png";
+  }
+
+  return variant === "mobile" ? "Social_Preview.jpg" : "Desktop_Hero.jpg";
+}
+
 export function buildArtifactMetadata(campaign) {
-  return [
+  const artifacts = [
     {
       key: "source",
       title: "Original_Source.txt",
@@ -123,6 +142,26 @@ export function buildArtifactMetadata(campaign) {
       route: "revisions"
     }
   ];
+
+  if (getPreviewAsset(campaign, "desktop")) {
+    artifacts.push({
+      key: "desktopImage",
+      title: getPreviewArtifactTitle(campaign, "desktop"),
+      type: getPreviewAsset(campaign, "desktop")?.contentType || "image/jpeg",
+      route: "desktop-image"
+    });
+  }
+
+  if (getPreviewAsset(campaign, "mobile")) {
+    artifacts.push({
+      key: "mobileImage",
+      title: getPreviewArtifactTitle(campaign, "mobile"),
+      type: getPreviewAsset(campaign, "mobile")?.contentType || "image/jpeg",
+      route: "mobile-image"
+    });
+  }
+
+  return artifacts;
 }
 
 export function buildArtifactFile(campaign, artifactKey) {
@@ -170,6 +209,28 @@ export function buildArtifactFile(campaign, artifactKey) {
         ...artifact,
         content: buildRevisionHistoryMarkdown(campaign)
       };
+    case "desktopImage": {
+      const asset = getPreviewAsset(campaign, "desktop");
+      if (!asset?.data) {
+        return null;
+      }
+      return {
+        ...artifact,
+        binary: true,
+        content: Buffer.from(asset.data, "base64")
+      };
+    }
+    case "mobileImage": {
+      const asset = getPreviewAsset(campaign, "mobile");
+      if (!asset?.data) {
+        return null;
+      }
+      return {
+        ...artifact,
+        binary: true,
+        content: Buffer.from(asset.data, "base64")
+      };
+    }
     default:
       return null;
   }

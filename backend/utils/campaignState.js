@@ -105,6 +105,7 @@ export function buildCampaignState({
   telemetry = {},
   revisionHistory,
   manualInstructions = [],
+  previewAssets = {},
   pendingGuidance = null,
   lastAppliedGuidance = null
 }) {
@@ -130,6 +131,7 @@ export function buildCampaignState({
     telemetry,
     revisionHistory: normalizeRevisionHistory(revisionHistory),
     manualInstructions: normalizeManualInstructions(manualInstructions),
+    previewAssets: previewAssets && typeof previewAssets === "object" ? previewAssets : {},
     pendingGuidance: pendingGuidance && typeof pendingGuidance === "object" && pendingGuidance.message ? pendingGuidance : null,
     lastAppliedGuidance: lastAppliedGuidance && typeof lastAppliedGuidance === "object" && lastAppliedGuidance.message ? lastAppliedGuidance : null
   };

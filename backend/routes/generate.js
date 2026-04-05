@@ -32,6 +32,7 @@ const REGENERATE_REVIEW_DELAY_MS = 1800;
 const REGENERATE_MAX_ATTEMPTS = 2;
 const AGENT_RETRY_LIMIT = 2;
 const AGENT_TIMEOUT_MS = 45000;
+const PREVIEW_RETRY_INTERVAL_MS = 8000;
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
@@ -301,6 +302,28 @@ function getImageTitle(payload) {
   return firstLine || payload?.facts?.valueProposition || "Campaign Preview";
 }
 
+function buildPreviewSignature(payload, variant = "desktop") {
+  const content = normalizeCampaignContent(payload?.content || {});
+  const facts = payload?.facts || {};
+  const source = payload?.source || {};
+
+  return crypto
+    .createHash("sha1")
+    .update(
+      JSON.stringify({
+        variant,
+        valueProposition: facts.valueProposition || "",
+        features: Array.isArray(facts.features) ? facts.features.slice(0, 5) : [],
+        audience: Array.isArray(facts.targetAudience) ? facts.targetAudience.slice(0, 3) : [],
+        blog: content.blog || "",
+        tweets: Array.isArray(content.tweets) ? content.tweets.slice(0, 3) : [],
+        email: content.email || "",
+        sourceLabel: source.label || ""
+      })
+    )
+    .digest("hex");
+}
+
 function buildImagePrompt(payload, variant = "desktop") {
   const facts = payload?.facts || {};
   const title = getImageTitle(payload);
@@ -394,6 +417,36 @@ function buildFallbackSvg(title, variant = "desktop") {
 </svg>`;
 }
 
+function buildPreviewAssetFromBuffer(payload, variant, prompt, buffer, contentType) {
+  return {
+    variant,
+    provider: "pollinations",
+    status: "generated",
+    prompt,
+    title: getImageTitle(payload),
+    signature: buildPreviewSignature(payload, variant),
+    contentType,
+    data: buffer.toString("base64"),
+    generatedAt: new Date().toISOString()
+  };
+}
+
+function buildPreviewAssetFromFallback(payload, variant) {
+  const svg = buildFallbackSvg(getImageTitle(payload), variant);
+
+  return {
+    variant,
+    provider: "local-svg",
+    status: "fallback",
+    prompt: buildImagePrompt(payload, variant),
+    title: getImageTitle(payload),
+    signature: buildPreviewSignature(payload, variant),
+    contentType: "image/svg+xml; charset=utf-8",
+    data: Buffer.from(svg, "utf8").toString("base64"),
+    generatedAt: new Date().toISOString()
+  };
+}
+
 async function fetchPreviewImage(payload, variant) {
   const prompt = buildImagePrompt(payload, variant);
   const seed = `${payload?.requestId || "campaign"}-${variant}`;
@@ -423,7 +476,101 @@ async function fetchPreviewImage(payload, variant) {
   const buffer = Buffer.from(await response.arrayBuffer());
   const contentType = response.headers.get("content-type") || "image/jpeg";
 
-  return { buffer, contentType };
+  return { buffer, contentType, prompt };
+}
+
+function getPreviewAsset(payload, variant) {
+  const asset = payload?.previewAssets?.[variant];
+  const signature = buildPreviewSignature(payload, variant);
+
+  if (asset?.data && asset?.signature === signature) {
+    return asset;
+  }
+
+  return null;
+}
+
+function shouldRetryPreviewAsset(asset) {
+  if (!asset || asset.status !== "fallback") {
+    return false;
+  }
+
+  const generatedAt = Date.parse(asset.generatedAt || "");
+
+  if (!Number.isFinite(generatedAt)) {
+    return true;
+  }
+
+  return Date.now() - generatedAt >= PREVIEW_RETRY_INTERVAL_MS;
+}
+
+async function ensurePreviewAsset(payload, variant, options = {}) {
+  const forceRefresh = Boolean(options.forceRefresh);
+  const existing = getPreviewAsset(payload, variant);
+
+  if (existing && !forceRefresh) {
+    return { asset: existing, payload };
+  }
+
+  return withActionLock(`preview-image:${payload.requestId}:${variant}`, async () => {
+    const refreshedPayload = await getStoredResult(payload.requestId);
+    const refreshedExisting = getPreviewAsset(refreshedPayload || payload, variant);
+
+    if (refreshedExisting && (!forceRefresh || refreshedExisting.status === "generated")) {
+      return { asset: refreshedExisting, payload: refreshedPayload || payload };
+    }
+
+    let asset;
+
+    try {
+      const { buffer, contentType, prompt } = await fetchPreviewImage(refreshedPayload || payload, variant);
+      asset = buildPreviewAssetFromBuffer(refreshedPayload || payload, variant, prompt, buffer, contentType);
+      logEvent("preview_asset_generated", {
+        requestId: payload.requestId,
+        campaignId: payload.campaignId,
+        variant,
+        provider: asset.provider
+      });
+    } catch (error) {
+      asset = buildPreviewAssetFromFallback(refreshedPayload || payload, variant);
+      logEvent("preview_asset_fallback", {
+        requestId: payload.requestId,
+        campaignId: payload.campaignId,
+        variant,
+        message: error.message
+      });
+    }
+
+    const nextPayload = {
+      ...(refreshedPayload || payload),
+      previewAssets: {
+        ...((refreshedPayload || payload)?.previewAssets || {}),
+        [variant]: asset
+      }
+    };
+
+    const saved = await saveCampaign(nextPayload);
+    const cached = cacheCampaign(saved || nextPayload);
+
+    return { asset, payload: cached };
+  });
+}
+
+function prewarmPreviewAssets(payload) {
+  if (!payload?.requestId) {
+    return;
+  }
+
+  for (const variant of ["desktop", "mobile"]) {
+    ensurePreviewAsset(payload, variant).catch((error) => {
+      logEvent("preview_asset_prewarm_error", {
+        requestId: payload.requestId,
+        campaignId: payload.campaignId,
+        variant,
+        message: error.message
+      });
+    });
+  }
 }
 
 async function runCampaignPipeline(input, requestId, source = createSourceDescriptor({ type: "text", originalInput: input })) {
@@ -542,15 +689,16 @@ async function runCampaignPipeline(input, requestId, source = createSourceDescri
   payload.lastAppliedGuidance = getLastAppliedGuidance(requestId);
 
   const savedPayload = await saveCampaign(payload);
-  cacheCampaign(savedPayload || payload);
+  const cachedPayload = cacheCampaign(savedPayload || payload);
+  prewarmPreviewAssets(cachedPayload);
   logEvent("campaign_completed", {
     requestId,
-    campaignId: (savedPayload || payload).campaignId,
-    status: (savedPayload || payload).status,
-    reviewStatus: (savedPayload || payload).reviewStatus,
+    campaignId: cachedPayload.campaignId,
+    status: cachedPayload.status,
+    reviewStatus: cachedPayload.reviewStatus,
     attempts
   });
-  return savedPayload || payload;
+  return cachedPayload;
 }
 
 router.get("/stream", (req, res) => {
@@ -588,7 +736,6 @@ router.get("/preview-image", async (req, res) => {
   }
 
   const payload = await getStoredResult(requestId);
-  const title = getImageTitle(payload);
 
   if (!payload) {
     res.setHeader("Content-Type", "image/svg+xml; charset=utf-8");
@@ -598,16 +745,75 @@ router.get("/preview-image", async (req, res) => {
   }
 
   try {
-    const { buffer, contentType } = await fetchPreviewImage(payload, variant);
-    res.setHeader("Content-Type", contentType);
+    const { asset } = await ensurePreviewAsset(payload, variant);
+    res.setHeader("Content-Type", asset.contentType);
     res.setHeader("Cache-Control", "private, max-age=3600");
-    res.send(buffer);
+    res.send(Buffer.from(asset.data, "base64"));
   } catch (error) {
-    console.error(`Preview image fallback used for ${requestId}/${variant}:`, error.message);
     res.setHeader("Content-Type", "image/svg+xml; charset=utf-8");
     res.setHeader("Cache-Control", "no-store");
-    res.send(buildFallbackSvg(title, variant));
+    res.send(buildFallbackSvg(getImageTitle(payload), variant));
   }
+});
+
+router.get("/preview-image-status", async (req, res) => {
+  const requestId = req.query.requestId;
+  const variant = req.query.variant === "mobile" ? "mobile" : "desktop";
+
+  if (!requestId || typeof requestId !== "string") {
+    res.status(400).json({ error: "requestId query parameter is required." });
+    return;
+  }
+
+  const payload = await getStoredResult(requestId);
+
+  if (!payload) {
+    res.json({
+      ready: false,
+      status: "missing",
+      variant
+    });
+    return;
+  }
+
+  const asset = getPreviewAsset(payload, variant);
+
+  if (!asset) {
+    ensurePreviewAsset(payload, variant).catch((error) => {
+      logEvent("preview_asset_status_error", {
+        requestId,
+        campaignId: payload.campaignId,
+        variant,
+        message: error.message
+      });
+    });
+
+    res.json({
+      ready: false,
+      status: "pending",
+      variant
+    });
+    return;
+  }
+
+  if (shouldRetryPreviewAsset(asset)) {
+    ensurePreviewAsset(payload, variant, { forceRefresh: true }).catch((error) => {
+      logEvent("preview_asset_retry_error", {
+        requestId,
+        campaignId: payload.campaignId,
+        variant,
+        message: error.message
+      });
+    });
+  }
+
+  res.json({
+    ready: asset.status === "generated",
+    status: asset.status || "pending",
+    provider: asset.provider || null,
+    generatedAt: asset.generatedAt || null,
+    variant
+  });
 });
 
 router.post("/", async (req, res, next) => {
@@ -961,7 +1167,10 @@ router.post("/regenerate", async (req, res, next) => {
     });
 
     const savedCampaign = await saveCampaign(nextStoredCampaign);
-    cacheCampaign(savedCampaign || nextStoredCampaign);
+    const cachedCampaign = cacheCampaign(savedCampaign || nextStoredCampaign);
+    if (!payload.preservedPrevious) {
+      prewarmPreviewAssets(cachedCampaign);
+    }
 
     logEvent("campaign_regenerated", {
       requestId,

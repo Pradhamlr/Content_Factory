@@ -68,6 +68,7 @@ function buildArtifacts(result) {
   }
 
   const artifacts = [];
+  const previewAssets = result?.previewAssets || {};
 
   if (result.content.blog) {
     artifacts.push({
@@ -106,6 +107,26 @@ function buildArtifacts(result) {
     title: "Compliance_Report.json",
     meta: result.status || "READY"
   });
+
+  if (previewAssets.desktop?.data) {
+    artifacts.push({
+      key: "desktop-image",
+      icon: "image",
+      iconClass: "is-cyan",
+      title: previewAssets.desktop.contentType?.includes("svg") ? "Desktop_Hero.svg" : "Desktop_Hero.jpg",
+      meta: previewAssets.desktop.status === "generated" ? "generated visual" : "fallback visual"
+    });
+  }
+
+  if (previewAssets.mobile?.data) {
+    artifacts.push({
+      key: "mobile-image",
+      icon: "imagesmode",
+      iconClass: "is-cyan",
+      title: previewAssets.mobile.contentType?.includes("svg") ? "Social_Preview.svg" : "Social_Preview.jpg",
+      meta: previewAssets.mobile.status === "generated" ? "generated visual" : "fallback visual"
+    });
+  }
 
   return artifacts;
 }

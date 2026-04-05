@@ -59,7 +59,7 @@ router.get("/:campaignId/artifacts/:artifactKey", async (req, res, next) => {
       return res.status(404).json({ error: "Artifact not found." });
     }
 
-    res.setHeader("Content-Type", `${artifact.type}; charset=utf-8`);
+    res.setHeader("Content-Type", artifact.type);
     res.setHeader("Content-Disposition", `attachment; filename="${artifact.title}"`);
     res.send(artifact.content);
   } catch (error) {

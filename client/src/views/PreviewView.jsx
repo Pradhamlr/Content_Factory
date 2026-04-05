@@ -1,3 +1,5 @@
+import { useEffect, useMemo, useRef, useState } from "react";
+
 function toHeadlineCase(value) {
   return String(value || "")
     .toLowerCase()
@@ -37,20 +39,6 @@ function buildBlogTitle(blog, facts = {}) {
   }
 
   return "Campaign Story";
-}
-
-function getBlogParagraphs(blog) {
-  if (!blog) {
-    return [];
-  }
-
-  return blog
-    .replace(/^#+\s*/gm, "")
-    .replace(/\*\*/g, "")
-    .split(/\n\s*\n/)
-    .map((item) => item.trim())
-    .filter(Boolean)
-    .slice(0, 3);
 }
 
 function getBlogExcerpt(blog) {
@@ -98,8 +86,6 @@ function hashString(value) {
   return Math.abs(hash);
 }
 
-const PREVIEW_VISUAL_FONT = "Inter, Arial, sans-serif";
-
 function buildTopicVisualDataUrl(seedSource, variant = "desktop") {
   const seed = hashString(seedSource || "campaign-preview");
   const width = variant === "mobile" ? 1080 : 1400;
@@ -142,7 +128,7 @@ function buildTopicVisualDataUrl(seedSource, variant = "desktop") {
         <path d="M 60 ${Math.round(height * 0.8)} L ${width - 60} ${Math.round(height * 0.8)}"/>
       </g>
       <rect x="44" y="44" width="170" height="42" rx="11" fill="#4f46e5"/>
-      <text x="69" y="71" fill="#ffffff" font-family="${PREVIEW_VISUAL_FONT}" font-size="20" font-weight="700">${label}</text>
+      <text x="69" y="71" fill="#ffffff" font-family="Inter, Arial, sans-serif" font-size="20" font-weight="700">${label}</text>
     </svg>
   `;
 
@@ -154,7 +140,7 @@ function formatDeployLabel(deployment) {
     return "Waiting for Deployment";
   }
 
-  return `Deployed • ${deployment.deployedChannels.length} channel${deployment.deployedChannels.length === 1 ? "" : "s"}`;
+  return `Deployed - ${deployment.deployedChannels.length} channel${deployment.deployedChannels.length === 1 ? "" : "s"}`;
 }
 
 export default function PreviewView({
@@ -166,13 +152,12 @@ export default function PreviewView({
   approvedTabs,
   deployment,
   actionLoading,
-  error
+  onNotify
 }) {
   const blog = result?.content?.blog || "";
   const tweets = Array.isArray(result?.content?.tweets) ? result.content.tweets : [];
   const email = result?.content?.email || "";
   const blogTitle = buildBlogTitle(blog, result?.facts);
-  const blogParagraphs = getBlogParagraphs(blog);
   const firstTweet = tweets[0] || "";
   const approvedCount = Object.values(approvedTabs || {}).filter(Boolean).length;
   const seoScore = hasCampaign ? result?.telemetry?.quality?.score ?? "--" : "--";
@@ -181,10 +166,114 @@ export default function PreviewView({
   const visualSync = hasCampaign ? `${approvedCount}/3 channels approved` : "No review data yet";
   const deployLabel = formatDeployLabel(deployment);
   const deploymentTime = deployment?.deployedAt ? new Date(deployment.deployedAt).toLocaleString() : "Not deployed";
-  const visualSeed = `${blogTitle}|${firstTweet}|${email}|${result?.facts?.valueProposition || ""}`;
-  const desktopImageUrl = hasCampaign ? buildTopicVisualDataUrl(visualSeed, "desktop") : "";
-  const mobileImageUrl = hasCampaign ? buildTopicVisualDataUrl(visualSeed, "mobile") : "";
+  const previewVersion = result?.updatedAt || result?.telemetry?.requestCompletedAt || result?.requestId || "preview";
+  const backendDesktopImageUrl =
+    hasCampaign && result?.requestId
+      ? `/api/generate/preview-image?requestId=${encodeURIComponent(result.requestId)}&variant=desktop&v=${encodeURIComponent(previewVersion)}`
+      : "";
+  const backendMobileImageUrl =
+    hasCampaign && result?.requestId
+      ? `/api/generate/preview-image?requestId=${encodeURIComponent(result.requestId)}&variant=mobile&v=${encodeURIComponent(previewVersion)}`
+      : "";
   const blogExcerpt = getBlogExcerpt(blog);
+  const fallbackSeed = `${blogTitle}|${firstTweet}|${email}|${result?.facts?.valueProposition || ""}`;
+  const fallbackDesktopImageUrl = useMemo(() => buildTopicVisualDataUrl(fallbackSeed, "desktop"), [fallbackSeed]);
+  const fallbackMobileImageUrl = useMemo(() => buildTopicVisualDataUrl(fallbackSeed, "mobile"), [fallbackSeed]);
+  const [imageReady, setImageReady] = useState({
+    desktop: result?.previewAssets?.desktop?.status === "generated",
+    mobile: result?.previewAssets?.mobile?.status === "generated"
+  });
+  const notifiedRef = useRef({
+    desktop: result?.previewAssets?.desktop?.status === "generated",
+    mobile: result?.previewAssets?.mobile?.status === "generated"
+  });
+
+  useEffect(() => {
+    const nextReady = {
+      desktop: result?.previewAssets?.desktop?.status === "generated",
+      mobile: result?.previewAssets?.mobile?.status === "generated"
+    };
+
+    setImageReady(nextReady);
+    notifiedRef.current = nextReady;
+  }, [result?.requestId, result?.updatedAt, result?.previewAssets?.desktop?.status, result?.previewAssets?.mobile?.status]);
+
+  useEffect(() => {
+    if (!hasCampaign || !result?.requestId) {
+      return undefined;
+    }
+
+    let disposed = false;
+
+    async function checkStatus(variant) {
+      try {
+        const response = await fetch(
+          `/api/generate/preview-image-status?requestId=${encodeURIComponent(result.requestId)}&variant=${variant}`,
+          {
+            headers: {
+              Accept: "application/json"
+            }
+          }
+        );
+
+        if (!response.ok) {
+          return;
+        }
+
+        const payload = await response.json();
+
+        if (disposed) {
+          return;
+        }
+
+        if (payload.ready) {
+          setImageReady((current) => {
+            if (current[variant]) {
+              return current;
+            }
+
+            return {
+              ...current,
+              [variant]: true
+            };
+          });
+
+          if (!notifiedRef.current[variant]) {
+            notifiedRef.current[variant] = true;
+            onNotify?.(
+              `${variant === "desktop" ? "Desktop hero image" : "Social preview image"} is ready.`,
+              "approved",
+              3200,
+              "image"
+            );
+          }
+        }
+      } catch {
+        // Keep the visual fallback in place silently until the next poll.
+      }
+    }
+
+    checkStatus("desktop");
+    checkStatus("mobile");
+
+    const intervalId = window.setInterval(() => {
+      if (!imageReady.desktop) {
+        checkStatus("desktop");
+      }
+
+      if (!imageReady.mobile) {
+        checkStatus("mobile");
+      }
+    }, 5000);
+
+    return () => {
+      disposed = true;
+      window.clearInterval(intervalId);
+    };
+  }, [hasCampaign, imageReady.desktop, imageReady.mobile, onNotify, result?.requestId]);
+
+  const desktopImageUrl = imageReady.desktop ? backendDesktopImageUrl : fallbackDesktopImageUrl;
+  const mobileImageUrl = imageReady.mobile ? backendMobileImageUrl : fallbackMobileImageUrl;
 
   return (
     <section className="preview-page">
@@ -234,7 +323,7 @@ export default function PreviewView({
                 <h3>{hasCampaign ? blogTitle || "Desktop preview will appear after generation" : "Desktop preview will appear after generation"}</h3>
 
                 {desktopImageUrl ? (
-                  <div className="browser-article__hero-image">
+                  <div className={`browser-article__hero-image${imageReady.desktop ? " is-generated" : " is-fallback"}`}>
                     <img src={desktopImageUrl} alt="Topic-based campaign hero visual" loading="lazy" />
                   </div>
                 ) : null}
@@ -286,7 +375,7 @@ export default function PreviewView({
 
                 <div className="phone-preview__content-card">
                   {mobileImageUrl ? (
-                    <div className="phone-preview__hero-image">
+                    <div className={`phone-preview__hero-image${imageReady.mobile ? " is-generated" : " is-fallback"}`}>
                       <img src={mobileImageUrl} alt="Topic-based social campaign visual" loading="lazy" />
                     </div>
                   ) : null}

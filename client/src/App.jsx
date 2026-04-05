@@ -810,6 +810,7 @@ export default function App() {
               deployment={deployment}
               actionLoading={previewActionLoading}
               error={error}
+              onNotify={showToast}
             />
           ) : null}
 
