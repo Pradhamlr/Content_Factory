@@ -19,8 +19,23 @@ dotenv.config({ path: path.join(__dirname, ".env") });
 
 const app = express();
 const PORT = process.env.PORT || 4000;
+const allowedOrigins = String(process.env.FRONTEND_URLS || process.env.FRONTEND_URL || "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
 
-app.use(cors());
+app.use(
+  cors({
+    origin(origin, callback) {
+      if (!origin || !allowedOrigins.length || allowedOrigins.includes(origin)) {
+        callback(null, true);
+        return;
+      }
+
+      callback(new Error("CORS origin not allowed"));
+    }
+  })
+);
 app.use(express.json({ limit: "1mb" }));
 
 // Lightweight health check for local verification and future deployments.
@@ -69,10 +84,15 @@ async function startServer() {
   }
 
   app.listen(PORT, () => {
-    console.log(`Autonomous Content Factory backend running on http://localhost:${PORT}`);
+    console.log(`Autonomous Content Factory backend running on port ${PORT}`);
     console.log(`Groq model: ${MODEL}`);
     console.log(`Agent logs: ${logFilePath}`);
     console.log(`System logs: ${systemLogFilePath}`);
+    if (allowedOrigins.length) {
+      console.log(`Allowed frontend origins: ${allowedOrigins.join(", ")}`);
+    } else {
+      console.log("Allowed frontend origins: all origins (no FRONTEND_URL configured)");
+    }
   });
 }
 
