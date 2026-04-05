@@ -29,6 +29,7 @@ const STAGE_TRANSITION_DELAY_MS = 1600;
 const ATTEMPT_START_DELAY_MS = 900;
 const RETRY_FEEDBACK_DELAY_MS = 1200;
 const REGENERATE_REVIEW_DELAY_MS = 1800;
+const REGENERATE_MAX_ATTEMPTS = 2;
 const AGENT_RETRY_LIMIT = 2;
 const AGENT_TIMEOUT_MS = 45000;
 const upload = multer({
@@ -210,6 +211,24 @@ function replaceChannelContent(currentContent, nextContent, channel) {
   }
 
   return current;
+}
+
+function getChannelContent(content, channel) {
+  const normalized = normalizeCampaignContent(content);
+
+  if (channel === "blog") {
+    return normalized.blog || "";
+  }
+
+  if (channel === "tweets") {
+    return normalized.tweets || [];
+  }
+
+  if (channel === "email") {
+    return normalized.email || "";
+  }
+
+  return "";
 }
 
 function getApprovals(requestId) {
@@ -778,9 +797,14 @@ router.post("/regenerate", async (req, res, next) => {
     const previousDeployment = existing?.deployment || getDeployment(requestId);
     const previousRevisionHistory = existing?.revisionHistory || createEmptyRevisionHistory();
     const hadApprovedBaseline = existing?.status === "APPROVED" && existing?.content;
+    const currentChannelContent = getChannelContent(existing?.content || currentContent, channel);
+    const latestRevision = Array.isArray(previousRevisionHistory?.[channel]) && previousRevisionHistory[channel].length
+      ? previousRevisionHistory[channel][previousRevisionHistory[channel].length - 1]
+      : null;
+    const priorRegenerationFeedback = latestRevision?.feedback || existing?.feedback || "";
 
     const channelLabel = channel === "tweets" ? "social thread" : channel === "email" ? "email teaser" : "blog post";
-    const feedback =
+    const baseFeedback =
       channel === "email"
         ? "Regenerate only the email teaser. Return a clear email-style asset with a concise subject line, a short preview line, and a brief body made of 2-3 compact paragraphs. Do not use all caps, placeholders like [Name], or generic filler."
         : `Regenerate only the ${channelLabel}. Keep every claim grounded in the provided facts and improve specificity, clarity, and structure for this one asset.`;
@@ -789,6 +813,12 @@ router.post("/regenerate", async (req, res, next) => {
       const pendingGuidance = getPendingGuidance(requestId);
       const operatorGuidance = pendingGuidance?.message || getLatestOperatorGuidance(requestId);
       const appliedGuidance = pendingGuidance || (operatorGuidance ? getLatestOperatorInstruction(requestId) : null);
+      let regenerateAttempt = 0;
+      let review = null;
+      let reviewedContent = null;
+      let draft = null;
+      let lastFeedback = priorRegenerationFeedback;
+
       publish(requestId, "attempt", {
         requestId,
         attempt: "regenerate",
@@ -801,20 +831,51 @@ router.post("/regenerate", async (req, res, next) => {
           message: "Pending operator guidance is being applied to this targeted rewrite."
         });
       }
-      await delay(ATTEMPT_START_DELAY_MS);
-      const draft = await runWithRecovery("Writer", requestId, () => writerAgent(facts, feedback, { requestId, operatorGuidance }));
-      await delay(REGENERATE_REVIEW_DELAY_MS);
-      const review = await runWithRecovery("Editor", requestId, () =>
-        editorAgent(draft, facts, {
-          requestId,
-          attempt: 1,
-          maxAttempts: 1,
-          previousFeedback: feedback,
-          operatorGuidance
-        })
-      );
 
-      const reviewedContent = review.status === "APPROVED" ? mergeCampaignContent(review.content, draft) : mergeCampaignContent(draft, {});
+      while (regenerateAttempt < REGENERATE_MAX_ATTEMPTS) {
+        regenerateAttempt += 1;
+        publish(requestId, "attempt", {
+          requestId,
+          attempt: `regenerate-${regenerateAttempt}`,
+          message: `Targeted rewrite attempt ${regenerateAttempt}/${REGENERATE_MAX_ATTEMPTS} for ${channelLabel}.`
+        });
+        await delay(ATTEMPT_START_DELAY_MS);
+
+        const combinedFeedback = [baseFeedback, lastFeedback].filter(Boolean).join("\n\n");
+        draft = await runWithRecovery("Writer", requestId, () =>
+          writerAgent(facts, combinedFeedback, {
+            requestId,
+            operatorGuidance,
+            channel: channelLabel,
+            currentChannelContent,
+            approvedBaselineExists: hadApprovedBaseline
+          })
+        );
+        await delay(REGENERATE_REVIEW_DELAY_MS);
+        review = await runWithRecovery("Editor", requestId, () =>
+          editorAgent(draft, facts, {
+            requestId,
+            attempt: regenerateAttempt,
+            maxAttempts: REGENERATE_MAX_ATTEMPTS,
+            previousFeedback: combinedFeedback,
+            operatorGuidance,
+            channel: channelLabel,
+            targetedRegeneration: true,
+            approvedBaselineExists: hadApprovedBaseline,
+            approvedBaselineContent: currentChannelContent
+          })
+        );
+
+        reviewedContent = review.status === "APPROVED" ? mergeCampaignContent(review.content, draft) : mergeCampaignContent(draft, {});
+
+        if (review.status === "APPROVED") {
+          break;
+        }
+
+        lastFeedback = review.feedback || combinedFeedback;
+        await delay(RETRY_FEEDBACK_DELAY_MS);
+      }
+
       const nextApprovals =
         review.status === "APPROVED"
           ? {
@@ -858,6 +919,7 @@ router.post("/regenerate", async (req, res, next) => {
         regenerationFeedback: review.feedback || "",
         approved: review.status === "APPROVED",
         preservedPrevious,
+        attempts: regenerateAttempt,
         approvals: nextApprovals,
         approvalMeta: nextApprovalMeta,
         deployment: previousDeployment,

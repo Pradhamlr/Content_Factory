@@ -112,6 +112,13 @@ FEEDBACK POLICY
 - Feedback must only ask for changes that can be made from the provided facts
 - Do not ask for any unavailable external evidence
 
+TARGETED REGENERATION POLICY
+- If a targeted regeneration is being reviewed and an approved baseline already exists, compare the new draft against that baseline fairly
+- Do NOT reject just because the new version is different
+- Approve if the rewrite is factually grounded, reasonably clear, and at least comparable in usefulness to the approved baseline
+- Reject only if the rewrite is clearly worse, more generic, structurally weaker, or introduces unsupported claims
+- If operator guidance was provided, check whether the rewrite makes a reasonable attempt to follow it
+
 OUTPUT FORMAT
 Return STRICT JSON only.
 

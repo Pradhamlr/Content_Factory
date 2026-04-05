@@ -29,6 +29,9 @@ ${JSON.stringify(facts, null, 2)}
 
 ${feedback ? `Fix based on this feedback: ${feedback}` : ""}
 ${context.operatorGuidance ? `Operator guidance to follow where possible without violating the facts: ${context.operatorGuidance}` : ""}
+${context.channel ? `Regenerate only this channel: ${context.channel}` : ""}
+${context.currentChannelContent ? `Current approved or latest channel draft to improve from:\n${typeof context.currentChannelContent === "string" ? context.currentChannelContent : JSON.stringify(context.currentChannelContent, null, 2)}` : ""}
+${context.approvedBaselineExists ? "An approved baseline already exists for this channel. Preserve what is working and improve clarity, specificity, and usefulness rather than rewriting from scratch." : ""}
 
 Return structured JSON:
 {
