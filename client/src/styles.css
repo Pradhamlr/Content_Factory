@@ -6,11 +6,17 @@
   --surface-container: #171f33;
   --surface-high: #222a3d;
   --surface-highest: #2d3449;
+  --surface-panel: #182235;
+  --surface-panel-elevated: #1d2840;
   --outline: rgba(59, 73, 75, 0.15);
   --outline-strong: rgba(59, 73, 75, 0.22);
   --text: #dae2fd;
   --text-muted: #94a3b8;
   --text-soft: #64748b;
+  --text-primary: #e8eefc;
+  --text-secondary: #b7c6db;
+  --text-muted-strong: #90a0b8;
+  --accent: #00f0ff;
   --primary: #00f0ff;
   --primary-dim: #00dbe9;
   --primary-soft: rgba(0, 240, 255, 0.1);
@@ -19,8 +25,25 @@
   --danger: #ffb4ab;
   --danger-soft: rgba(255, 180, 171, 0.1);
   --shadow: 20px 0 40px rgba(0, 0, 0, 0.4);
+  --shadow-soft: 0 16px 36px rgba(2, 6, 23, 0.28);
+  --shadow-panel: 0 0 20px rgba(0, 0, 0, 0.3);
   --radius-md: 0.5rem;
   --radius-lg: 0.75rem;
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --type-12: 0.75rem;
+  --type-13: 0.8125rem;
+  --type-14: 0.875rem;
+  --type-16: 1rem;
+  --type-20: 1.25rem;
+  --type-24: 1.5rem;
+  --type-32: 2rem;
+  --font-body: "Inter", sans-serif;
+  --font-display: "Space Grotesk", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
 * {
@@ -37,8 +60,10 @@ body {
   margin: 0;
   overflow: hidden;
   background: var(--background);
-  color: var(--text);
-  font-family: "Inter", sans-serif;
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: var(--type-14);
+  line-height: 1.5;
   selection-color: #006970;
 }
 
@@ -83,7 +108,7 @@ button {
 button,
 input,
 textarea {
-  transition: transform 180ms ease, opacity 180ms ease, box-shadow 180ms ease, border-color 180ms ease, background 180ms ease, color 180ms ease;
+  transition: transform 180ms ease, opacity 180ms ease, box-shadow 180ms ease, border-color 180ms ease, background 180ms ease, color 180ms ease, filter 180ms ease;
 }
 
 button:focus-visible,
@@ -210,10 +235,10 @@ textarea:focus-visible {
   width: 16rem;
   height: calc(100vh - 4rem);
   padding: 0;
-  background: var(--surface-low);
+  background: linear-gradient(180deg, rgba(19, 27, 46, 0.98), rgba(13, 19, 34, 0.98));
   box-shadow: var(--shadow);
-  font-family: "Space Grotesk", sans-serif;
-  letter-spacing: -0.02em;
+  font-family: var(--font-body);
+  letter-spacing: normal;
 }
 
 .app-sidebar__brand {
@@ -227,17 +252,19 @@ textarea:focus-visible {
 }
 
 .app-sidebar__title {
-  color: var(--primary);
-  font-size: 1.08rem;
+  color: var(--accent);
+  font-family: var(--font-display);
+  font-size: var(--type-24);
   line-height: 1.05;
   font-weight: 700;
   text-transform: uppercase;
+  letter-spacing: -0.04em;
 }
 
 .app-sidebar__subtitle {
   margin-top: 0.45rem;
-  color: rgba(148, 163, 184, 0.72);
-  font-size: 0.54rem;
+  color: var(--text-muted-strong);
+  font-size: var(--type-12);
   letter-spacing: 0.18em;
   text-transform: uppercase;
 }
@@ -254,27 +281,32 @@ textarea:focus-visible {
 .app-sidebar__nav-item {
   border: 0;
   background: transparent;
-  color: rgba(148, 163, 184, 0.88);
+  color: var(--text-secondary);
   display: flex;
   align-items: center;
   gap: 0.75rem;
   justify-content: flex-start;
   padding: 0.88rem 1rem;
   border-radius: 0.5rem;
-  font-size: 0.88rem;
+  font-size: var(--type-16);
+  font-weight: 500;
   text-align: left;
-  transition: all 300ms ease;
+  border: 1px solid transparent;
+  transition: all 240ms ease;
 }
 
 .app-sidebar__nav-item:hover {
-  background: var(--surface-highest);
-  color: #e2e8f0;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-primary);
+  border-color: rgba(255,255,255,0.06);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.16);
 }
 
 .app-sidebar__nav-item.is-active {
-  color: var(--primary);
-  background: var(--surface-highest);
-  box-shadow: inset -2px 0 0 var(--primary);
+  color: var(--accent);
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(0, 240, 255, 0.16);
+  box-shadow: inset -2px 0 0 var(--accent), 0 0 18px rgba(0, 240, 255, 0.08);
 }
 
 .app-sidebar__nav-icon {
@@ -290,7 +322,7 @@ textarea:focus-visible {
 .app-sidebar__new-button {
   width: 100%;
   border: 0;
-  border-radius: var(--radius-md);
+  border-radius: 0.75rem;
   padding: 0.92rem 1rem;
   display: flex;
   align-items: center;
@@ -299,14 +331,17 @@ textarea:focus-visible {
   background: linear-gradient(135deg, var(--primary-dim), #dbfcff);
   color: #00363a;
   font-weight: 700;
-  font-size: 0.82rem;
-  letter-spacing: 0.04em;
+  font-size: var(--type-14);
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  transition: opacity 180ms ease, transform 180ms ease;
+  box-shadow: 0 10px 24px rgba(0, 219, 233, 0.18);
+  transition: opacity 180ms ease, transform 180ms ease, filter 180ms ease, box-shadow 180ms ease;
 }
 
 .app-sidebar__new-button:hover {
-  opacity: 0.92;
+  opacity: 0.96;
+  filter: brightness(1.03);
+  box-shadow: 0 14px 28px rgba(0, 219, 233, 0.22);
 }
 
 .app-sidebar__new-button:active {
@@ -337,19 +372,19 @@ textarea:focus-visible {
   color: var(--text);
   font-size: 0.72rem;
   font-weight: 700;
-  font-family: "Inter", sans-serif;
+  font-family: var(--font-body);
 }
 
 .app-sidebar__profile-name {
   color: var(--text);
-  font-family: "Inter", sans-serif;
+  font-family: var(--font-body);
   font-size: 0.78rem;
   font-weight: 700;
 }
 
 .app-sidebar__profile-role {
   color: rgba(148, 163, 184, 0.72);
-  font-family: "Inter", sans-serif;
+  font-family: var(--font-body);
   font-size: 0.63rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -372,11 +407,11 @@ textarea:focus-visible {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: #131b2e;
-  border-bottom: 1px solid rgba(6, 182, 212, 0.1);
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
-  font-family: "Space Grotesk", sans-serif;
-  letter-spacing: -0.02em;
+  background: rgba(19, 27, 46, 0.98);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: var(--shadow-soft);
+  font-family: var(--font-body);
+  letter-spacing: normal;
 }
 
 .app-topbar__system {
@@ -386,10 +421,11 @@ textarea:focus-visible {
 }
 
 .app-topbar__system-name {
-  color: #22d3ee;
-  font-size: 1.1rem;
+  color: var(--accent);
+  font-family: var(--font-display);
+  font-size: var(--type-20);
   font-weight: 700;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
@@ -403,23 +439,23 @@ textarea:focus-visible {
 .app-topbar__search input {
   width: 100%;
   height: 2.2rem;
-  border: 0;
+  border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 999px;
   padding: 0 1rem 0 2.4rem;
-  background: #1c263d;
-  color: #e2e8f0;
-  font-size: 0.82rem;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-primary);
+  font-size: var(--type-14);
   outline: none;
 }
 
 .app-topbar__search input::placeholder {
-  color: rgba(34, 211, 238, 0.25);
+  color: var(--text-muted-strong);
 }
 
 .app-topbar__search-symbol {
   position: absolute;
   left: 0.8rem;
-  color: rgba(34, 211, 238, 0.5);
+  color: var(--text-muted-strong);
   font-size: 1.1rem;
   pointer-events: none;
 }
@@ -438,14 +474,16 @@ textarea:focus-visible {
   display: grid;
   place-items: center;
   background: transparent;
-  color: rgba(148, 163, 184, 0.82);
+  color: var(--text-secondary);
   transition: all 220ms ease;
   position: relative;
+  border: 1px solid transparent;
 }
 
 .app-topbar__icon-button:hover {
-  color: #67e8f9;
-  background: rgba(6, 182, 212, 0.05);
+  color: var(--accent);
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255,255,255,0.06);
 }
 
 .app-topbar__icon-button .material-symbols-outlined {
@@ -537,7 +575,7 @@ textarea:focus-visible {
 
 .campaign-hero__copy h2 {
   margin: 0 0 0.5rem;
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--font-display);
   font-size: 2rem;
   font-weight: 700;
   letter-spacing: -0.04em;
@@ -546,8 +584,8 @@ textarea:focus-visible {
 .campaign-hero__copy p {
   max-width: 36rem;
   margin: 0;
-  color: rgba(148, 163, 184, 0.82);
-  font-size: 0.9rem;
+  color: var(--text-secondary);
+  font-size: var(--type-16);
   line-height: 1.6;
 }
 
@@ -562,8 +600,9 @@ textarea:focus-visible {
   min-height: 17rem;
   padding: 3.1rem 2.6rem 2.2rem;
   text-align: center;
-  background: var(--surface-high);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+  background: linear-gradient(180deg, rgba(30, 40, 61, 0.98), rgba(24, 34, 53, 0.98));
+  border: 1px solid rgba(255,255,255,0.06);
+  box-shadow: var(--shadow-panel), inset 0 1px 0 rgba(255,255,255,0.03);
   transition: transform 220ms ease, box-shadow 220ms ease, border-color 220ms ease, background 220ms ease;
 }
 
@@ -586,16 +625,18 @@ textarea:focus-visible {
 
 .campaign-uploader h3 {
   margin: 0 0 0.45rem;
-  font-size: 1.1rem;
+  font-family: var(--font-display);
+  font-size: var(--type-24);
   font-weight: 700;
+  letter-spacing: -0.03em;
 }
 
 .campaign-uploader p {
   width: 26rem;
   max-width: 100%;
   margin: 0 auto 1.15rem;
-  color: rgba(148, 163, 184, 0.82);
-  font-size: 0.84rem;
+  color: var(--text-secondary);
+  font-size: var(--type-16);
   line-height: 1.55;
 }
 
@@ -627,8 +668,8 @@ textarea:focus-visible {
   padding: 0.45rem 0.72rem;
   border-radius: 0.38rem;
   background: var(--surface-low);
-  color: rgba(148, 163, 184, 0.82);
-  font-size: 0.62rem;
+  color: var(--text-secondary);
+  font-size: var(--type-12);
   font-weight: 700;
   letter-spacing: 0.12em;
   display: inline-flex;
@@ -659,14 +700,15 @@ textarea:focus-visible {
 .campaign-uploader textarea {
   width: 100%;
   min-height: 14rem;
-  border: 0;
+  border: 1px solid rgba(255,255,255,0.06);
   border-radius: 0.5rem;
   padding: 1rem 1.1rem;
   resize: vertical;
   outline: none;
-  background: rgba(6, 14, 32, 0.9);
-  color: var(--text);
-  font-size: 0.9rem;
+  background: rgba(8, 15, 30, 0.94);
+  color: var(--text-primary);
+  font-size: var(--type-16);
+  line-height: 1.65;
 }
 
 .campaign-uploader__file-name {
@@ -766,7 +808,7 @@ textarea:focus-visible {
 
 .campaign-modal__header h3 {
   margin: 0;
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--font-display);
   font-size: 1.18rem;
   line-height: 1.2;
   letter-spacing: -0.03em;
@@ -873,7 +915,7 @@ textarea:focus-visible {
 
 .campaign-history__header h3 {
   margin: 0;
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--font-display);
   font-size: 1rem;
 }
 
@@ -1120,7 +1162,7 @@ textarea:focus-visible {
   margin: 0;
   max-width: 46rem;
   color: var(--text);
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--font-display);
   font-size: 1.46rem;
   line-height: 1.16;
   letter-spacing: -0.03em;
@@ -1133,6 +1175,27 @@ textarea:focus-visible {
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
+}
+
+.war-room-summary__ambiguity-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.85rem;
+  padding: 0.42rem 0.7rem;
+  border: 1px solid rgba(255, 180, 171, 0.16);
+  border-radius: 999px;
+  background: rgba(255, 180, 171, 0.07);
+  color: #ffcdc7;
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.war-room-summary__ambiguity-chip .material-symbols-outlined {
+  font-size: 0.9rem;
+  color: #ffb4ab;
 }
 
 .war-room-agents {
@@ -1320,11 +1383,22 @@ textarea:focus-visible {
   text-transform: uppercase;
 }
 
+.war-room-checklist__label {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 0.28rem;
+}
+
+.war-room-checklist__label em {
+  font-style: normal;
+  color: rgba(148, 163, 184, 0.72);
+}
+
 .war-room-insight-stat strong {
   display: block;
   margin-top: 0.35rem;
   color: var(--text);
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--font-display);
   font-size: 1.5rem;
   line-height: 1;
 }
@@ -1333,6 +1407,13 @@ textarea:focus-visible {
   flex: 1;
   display: grid;
   gap: 0.75rem;
+}
+
+.war-room-checklist__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.9rem;
 }
 
 .war-room-checklist div,
@@ -1350,6 +1431,12 @@ textarea:focus-visible {
   color: var(--text);
   font-size: 0.9rem;
   font-weight: 800;
+}
+
+.war-room-checklist__item strong {
+  margin-top: 0;
+  flex-shrink: 0;
+  text-align: right;
 }
 
 .war-room-checklist .is-approved,
@@ -1423,12 +1510,12 @@ textarea:focus-visible {
 .war-agent-card {
   min-height: 11rem;
   padding: 1.6rem 1.45rem 1.38rem;
-  border: 1px solid rgba(59, 73, 75, 0.2);
-  background: linear-gradient(180deg, rgba(20, 28, 46, 0.95), rgba(13, 19, 34, 0.98));
+  border: 1px solid rgba(255,255,255,0.06);
+  background: linear-gradient(180deg, rgba(25, 35, 56, 0.96), rgba(15, 22, 38, 0.99));
   text-align: center;
   transition: all 500ms ease;
-  opacity: 0.78;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.015);
+  opacity: 0.84;
+  box-shadow: var(--shadow-panel), inset 0 1px 0 rgba(255,255,255,0.03);
 }
 
 .war-agent-card.is-gatekeeper {
@@ -1557,7 +1644,7 @@ textarea:focus-visible {
 .war-agent-card h3 {
   margin: 0;
   color: var(--text);
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--font-display);
   font-size: 0.98rem;
   line-height: 1.18;
   font-weight: 700;
@@ -1577,7 +1664,7 @@ textarea:focus-visible {
   margin-top: 0.78rem;
   color: rgba(148, 163, 184, 0.6);
   font-size: 0.5rem;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--font-mono);
   letter-spacing: 0.14em;
   text-transform: uppercase;
 }
@@ -1596,9 +1683,9 @@ textarea:focus-visible {
   min-height: 28rem;
   margin-bottom: 1.2rem;
   overflow: hidden;
-  border: 1px solid rgba(59, 73, 75, 0.14);
-  background: linear-gradient(180deg, rgba(6, 14, 32, 0.58), rgba(6, 14, 32, 0.7));
-  box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.18), 0 16px 32px rgba(0, 0, 0, 0.14);
+  border: 1px solid rgba(255,255,255,0.06);
+  background: linear-gradient(180deg, rgba(10, 17, 31, 0.88), rgba(9, 15, 28, 0.96));
+  box-shadow: var(--shadow-panel), inset 0 1px 0 rgba(255,255,255,0.03);
 }
 
 .war-room-stream__head {
@@ -1637,7 +1724,7 @@ textarea:focus-visible {
   min-height: 0;
   overflow-y: auto;
   padding: 1.2rem 1.45rem 1.3rem;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--font-mono);
   scrollbar-width: thin;
   scrollbar-color: rgba(148, 163, 184, 0.35) transparent;
 }
@@ -1723,7 +1810,7 @@ textarea:focus-visible {
 .war-room-stream__input-label {
   color: rgba(148, 163, 184, 0.68);
   font-size: 0.58rem;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--font-mono);
   letter-spacing: 0.02em;
   text-transform: uppercase;
 }
@@ -1734,7 +1821,7 @@ textarea:focus-visible {
   background: transparent;
   color: rgba(226, 232, 240, 0.9);
   font-size: 0.7rem;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--font-mono);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -1826,7 +1913,7 @@ textarea:focus-visible {
   flex-direction: column;
   width: 20rem;
   background: #0d1326;
-  border-left: 1px solid rgba(59, 73, 75, 0.1);
+  border-left: 1px solid rgba(255,255,255,0.06);
   overflow: visible;
 }
 
@@ -1851,8 +1938,8 @@ textarea:focus-visible {
 
 .war-room-panel__subtitle {
   margin-top: 0.2rem;
-  color: rgba(148, 163, 184, 0.62);
-  font-size: 0.5rem;
+  color: var(--text-muted-strong);
+  font-size: var(--type-12);
   letter-spacing: 0.18em;
   text-transform: uppercase;
 }
@@ -1860,9 +1947,9 @@ textarea:focus-visible {
 .war-room-verdict {
   padding: 1rem 1.05rem;
   border-radius: 0.75rem;
-  background: linear-gradient(180deg, rgba(12, 18, 33, 0.94), rgba(6, 14, 32, 0.94));
-  border: 1px solid rgba(59, 73, 75, 0.14);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+  background: linear-gradient(180deg, rgba(22, 31, 49, 0.96), rgba(14, 20, 34, 0.98));
+  border: 1px solid rgba(255,255,255,0.06);
+  box-shadow: var(--shadow-panel), inset 0 1px 0 rgba(255,255,255,0.02);
 }
 
 .war-room-verdict strong {
@@ -1875,8 +1962,8 @@ textarea:focus-visible {
 
 .war-room-verdict p {
   margin: 0.45rem 0 0;
-  color: rgba(148, 163, 184, 0.76);
-  font-size: 0.72rem;
+  color: var(--text-secondary);
+  font-size: var(--type-13);
   line-height: 1.55;
 }
 
@@ -1949,7 +2036,7 @@ textarea:focus-visible {
   margin-bottom: 0.35rem;
   color: rgba(148, 163, 184, 0.78);
   font-size: 0.62rem;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--font-mono);
   letter-spacing: 0.04em;
 }
 
@@ -2048,7 +2135,7 @@ textarea:focus-visible {
   padding-left: 1rem;
   color: rgba(148, 163, 184, 0.82);
   font-size: 0.66rem;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--font-mono);
   line-height: 1.7;
 }
 
@@ -2097,7 +2184,7 @@ textarea:focus-visible {
   display: block;
   margin-top: 0.35rem;
   font-size: 0.78rem;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--font-mono);
   color: var(--green-text);
 }
 
@@ -2114,7 +2201,7 @@ textarea:focus-visible {
 
 .placeholder-view__panel h2 {
   margin: 0 0 0.6rem;
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--font-display);
 }
 
 .placeholder-view__panel p {
@@ -2206,8 +2293,9 @@ textarea:focus-visible {
 .review-source {
   display: flex;
   flex-direction: column;
-  background: var(--surface-low);
-  border: 1px solid rgba(59, 73, 75, 0.1);
+  background: linear-gradient(180deg, rgba(21, 31, 49, 0.98), rgba(15, 22, 38, 0.98));
+  border: 1px solid rgba(255,255,255,0.06);
+  box-shadow: var(--shadow-panel);
 }
 
 .review-source__header {
@@ -2232,7 +2320,7 @@ textarea:focus-visible {
 .review-source__title-group h2 {
   margin: 0;
   color: var(--text);
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--font-display);
   font-size: 0.84rem;
   font-weight: 700;
   letter-spacing: 0.02em;
@@ -2240,8 +2328,8 @@ textarea:focus-visible {
 
 .review-source__title-group p {
   margin: 0.15rem 0 0;
-  color: rgba(148, 163, 184, 0.6);
-  font-size: 0.52rem;
+  color: var(--text-muted-strong);
+  font-size: var(--type-12);
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
@@ -2263,8 +2351,8 @@ textarea:focus-visible {
   min-height: 0;
   overflow-y: auto;
   padding: 1.55rem 1.5rem;
-  color: rgba(148, 163, 184, 0.84);
-  font-size: 0.88rem;
+  color: var(--text-secondary);
+  font-size: var(--type-16);
   line-height: 1.8;
 }
 
@@ -2297,9 +2385,9 @@ textarea:focus-visible {
 .review-content {
   display: flex;
   flex-direction: column;
-  background: rgba(6, 14, 32, 0.9);
-  border: 1px solid rgba(59, 73, 75, 0.2);
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.28);
+  background: linear-gradient(180deg, rgba(12, 18, 33, 0.96), rgba(8, 14, 28, 0.98));
+  border: 1px solid rgba(255,255,255,0.06);
+  box-shadow: var(--shadow-soft);
 }
 
 .review-content__tabs {
@@ -2324,7 +2412,7 @@ textarea:focus-visible {
 .review-content__tab {
   border: 0;
   background: transparent;
-  color: rgba(148, 163, 184, 0.6);
+  color: var(--text-muted-strong);
   padding: 1rem 1.15rem;
   font-size: 0.62rem;
   font-weight: 800;
@@ -2340,8 +2428,8 @@ textarea:focus-visible {
 
 .review-content__tab-summary {
   margin: 0.45rem 0 0;
-  color: rgba(148, 163, 184, 0.72);
-  font-size: 0.68rem;
+  color: var(--text-secondary);
+  font-size: var(--type-13);
   line-height: 1.5;
   max-width: 28rem;
 }
@@ -2383,10 +2471,10 @@ textarea:focus-visible {
 .review-history {
   margin: 0.95rem 1.5rem 1.2rem;
   border-radius: 0.8rem;
-  background: rgba(24, 32, 47, 0.68);
-  border: 1px solid rgba(59, 73, 75, 0.12);
+  background: rgba(24, 32, 47, 0.88);
+  border: 1px solid rgba(255,255,255,0.06);
   overflow: hidden;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 
 .review-history__toggle {
@@ -2418,7 +2506,7 @@ textarea:focus-visible {
 .review-history__header h3 {
   margin: 0;
   font-size: 0.9rem;
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--font-display);
 }
 
 .review-history__header span {
@@ -2598,7 +2686,7 @@ textarea:focus-visible {
 .review-format h1 {
   margin: 0;
   color: var(--text);
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--font-display);
   font-size: 1.55rem;
   line-height: 1.2;
   font-weight: 800;
@@ -2607,8 +2695,8 @@ textarea:focus-visible {
 
 .review-format__lead {
   margin: 0.85rem 0 0;
-  color: #b7c7d8;
-  font-size: 0.95rem;
+  color: var(--text-secondary);
+  font-size: var(--type-16);
   line-height: 1.75;
 }
 
@@ -2643,7 +2731,7 @@ textarea:focus-visible {
   background: rgba(28, 37, 54, 0.9);
   border: 1px solid rgba(255, 255, 255, 0.04);
   color: #f3f7ff;
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--font-display);
   font-size: 1.16rem;
   line-height: 1.32;
   font-weight: 700;
@@ -2652,9 +2740,10 @@ textarea:focus-visible {
 
 .review-blog-panel {
   border-radius: 0.8rem;
-  background: rgba(28, 37, 54, 0.76);
+  background: rgba(28, 37, 54, 0.9);
   padding: 1.1rem 1.15rem;
-  border: 1px solid rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: var(--shadow-panel);
 }
 
 .review-blog-panel__content {
@@ -2683,8 +2772,9 @@ textarea:focus-visible {
 .review-social-card {
   padding: 1rem 1rem 0.9rem;
   border-radius: 0.75rem;
-  border: 1px solid rgba(59, 73, 75, 0.14);
-  background: linear-gradient(180deg, rgba(19, 27, 46, 0.95), rgba(12, 19, 34, 0.98));
+  border: 1px solid rgba(255,255,255,0.06);
+  background: linear-gradient(180deg, rgba(24, 34, 53, 0.98), rgba(14, 21, 36, 0.99));
+  box-shadow: var(--shadow-panel);
 }
 
 .review-social-card__top {
@@ -2753,9 +2843,9 @@ textarea:focus-visible {
 .review-email-card {
   overflow: hidden;
   border-radius: 0.85rem;
-  border: 1px solid rgba(59, 73, 75, 0.14);
-  background: linear-gradient(180deg, rgba(19, 27, 46, 0.96), rgba(10, 16, 28, 0.98));
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255,255,255,0.06);
+  background: linear-gradient(180deg, rgba(24, 34, 53, 0.98), rgba(12, 18, 32, 0.99));
+  box-shadow: var(--shadow-panel), inset 0 1px 0 rgba(255,255,255,0.02);
 }
 
 .review-email-card__bar {
@@ -3003,7 +3093,7 @@ textarea:focus-visible {
 
 .review-override-modal__header h3 {
   margin: 0;
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--font-display);
   font-size: 1.12rem;
   line-height: 1.22;
 }
@@ -3088,7 +3178,7 @@ textarea:focus-visible {
 .preview-page__hero h2 {
   margin: 0;
   color: var(--text);
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--font-display);
   font-size: 2rem;
   font-weight: 700;
   letter-spacing: -0.04em;
@@ -3168,8 +3258,8 @@ textarea:focus-visible {
   display: flex;
   align-items: center;
   gap: 0.45rem;
-  color: rgba(148, 163, 184, 0.78);
-  font-size: 0.62rem;
+  color: var(--text-secondary);
+  font-size: var(--type-12);
   font-weight: 800;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -3185,7 +3275,7 @@ textarea:focus-visible {
   border-radius: var(--radius-md);
   background: rgba(155, 240, 0, 0.12);
   color: #d4ff91;
-  font-size: 0.58rem;
+  font-size: var(--type-12);
   font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -3202,9 +3292,9 @@ textarea:focus-visible {
 .browser-preview {
   overflow: hidden;
   border-radius: 0.85rem;
-  border: 1px solid rgba(59, 73, 75, 0.2);
+  border: 1px solid rgba(255,255,255,0.06);
   background: var(--surface);
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--shadow-soft);
 }
 
 .browser-preview__topbar {
@@ -3269,7 +3359,7 @@ textarea:focus-visible {
 .browser-article h3 {
   margin: 0 0 1.25rem;
   color: #1e1b4b;
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--font-display);
   font-size: 1.15rem;
   line-height: 1.35;
   font-weight: 800;
@@ -3454,8 +3544,9 @@ textarea:focus-visible {
   min-height: 8.6rem;
   padding: 1.2rem;
   border-radius: var(--radius-md);
-  background: var(--surface-low);
-  border: 1px solid rgba(59, 73, 75, 0.1);
+  background: linear-gradient(180deg, rgba(24, 34, 53, 0.98), rgba(14, 21, 36, 0.99));
+  border: 1px solid rgba(255,255,255,0.06);
+  box-shadow: var(--shadow-panel);
 }
 
 .preview-stat__label {
@@ -3463,8 +3554,8 @@ textarea:focus-visible {
   align-items: center;
   gap: 0.45rem;
   margin-bottom: 0.8rem;
-  color: rgba(148, 163, 184, 0.72);
-  font-size: 0.56rem;
+  color: var(--text-muted-strong);
+  font-size: var(--type-12);
   font-weight: 800;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -3478,7 +3569,7 @@ textarea:focus-visible {
 .preview-stat strong {
   display: block;
   color: var(--text);
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--font-display);
   font-size: 1.5rem;
   line-height: 1.1;
 }
@@ -3491,8 +3582,8 @@ textarea:focus-visible {
 
 .preview-stat p {
   margin: 0.65rem 0 0;
-  color: rgba(148, 163, 184, 0.62);
-  font-size: 0.62rem;
+  color: var(--text-secondary);
+  font-size: var(--type-12);
   line-height: 1.5;
 }
 
@@ -3545,7 +3636,7 @@ textarea:focus-visible {
 .preview-stat__status strong {
   color: #d4ff91;
   font-size: 0.62rem;
-  font-family: "Inter", sans-serif;
+  font-family: var(--font-body);
   font-weight: 800;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -3578,8 +3669,8 @@ textarea:focus-visible {
   padding: 1rem 1.2rem 1rem 1.5rem;
   background: var(--primary);
   color: #00363a;
-  box-shadow: 0 10px 30px rgba(0, 240, 255, 0.4);
-  font-size: 0.7rem;
+  box-shadow: 0 12px 32px rgba(0, 240, 255, 0.28);
+  font-size: var(--type-13);
   font-weight: 900;
   letter-spacing: 0.12em;
   text-transform: uppercase;

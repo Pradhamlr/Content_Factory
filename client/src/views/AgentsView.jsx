@@ -1,7 +1,27 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 function formatStatus(status) {
   return String(status || "idle").replace(/_/g, " ").toUpperCase();
+}
+
+function formatStatusLabel(status) {
+  return String(status || "--")
+    .replace(/_/g, " ")
+    .toLowerCase()
+    .split(" ")
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
+function capitalizeFirstLetter(value) {
+  const text = String(value || "").trim();
+
+  if (!text) {
+    return "";
+  }
+
+  return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
 function formatDuration(ms) {
@@ -179,6 +199,7 @@ function AgentCard({ title, status, active, complete, blocked, accent }) {
 
 export default function AgentsView({ liveLogs, agentStages, loading, result, hasCampaign, deployment, reviewActionState, onArtifactOpen, onSubmitOperatorInput }) {
   const [operatorInput, setOperatorInput] = useState("");
+  const ambiguitiesRef = useRef(null);
   const logs = liveLogs.length
     ? liveLogs
     : loading
@@ -241,6 +262,16 @@ export default function AgentsView({ liveLogs, agentStages, loading, result, has
           <div className="war-room-summary__eyebrow">Multi-Agent Pipeline</div>
           <h2>Iterative validation with feedback optimization across research, writing, and editorial control.</h2>
           <p>Research &rarr; Write &rarr; Validate &rarr; Refine</p>
+          {hasCampaign && intelligence.ambiguities ? (
+            <button
+              type="button"
+              className="war-room-summary__ambiguity-chip"
+              onClick={() => ambiguitiesRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+            >
+              <span className="material-symbols-outlined">warning</span>
+              <span>{intelligence.ambiguities} Ambiguities Detected</span>
+            </button>
+          ) : null}
         </div>
 
         <div className="war-room-agents">
@@ -423,18 +454,18 @@ export default function AgentsView({ liveLogs, agentStages, loading, result, has
                   <strong>{attempts || 1}</strong>
                 </div>
                 <div className="war-room-checklist">
-                  <div>
-                    <span>Initial Draft</span>
+                  <div className="war-room-checklist__item">
+                    <span className="war-room-checklist__label">Initial Draft <em>&rarr;</em></span>
                     <strong className={attempts > 1 ? "is-rejected" : "is-approved"}>{attempts > 1 ? "Rejected" : "Approved"}</strong>
                   </div>
-                  <div>
-                    <span>Final Output</span>
-                    <strong className={result?.status === "APPROVED" ? "is-approved" : "is-rejected"}>{result?.status || "--"}</strong>
+                  <div className="war-room-checklist__item">
+                    <span className="war-room-checklist__label">Refined Output <em>&rarr;</em></span>
+                    <strong className={result?.status === "APPROVED" ? "is-approved" : "is-rejected"}>{formatStatusLabel(result?.status)}</strong>
                   </div>
-                  <div>
+                  <div className="war-room-checklist__item">
                     <span>Latest Review</span>
                     <strong className={String(result?.reviewStatus || "").includes("REJECTED") ? "is-rejected" : "is-approved"}>
-                      {result?.reviewStatus || "--"}
+                      {formatStatusLabel(result?.reviewStatus)}
                     </strong>
                   </div>
                 </div>
@@ -467,20 +498,20 @@ export default function AgentsView({ liveLogs, agentStages, loading, result, has
           </section>
         </div>
 
-        <section className="war-room-ambiguities">
-          <div className="war-room-ambiguities__header">
-            <div className="war-room-ambiguities__title">
-              <span className="material-symbols-outlined">warning</span>
-              <h3>Ambiguities Detected {hasCampaign ? `(${ambiguities.length})` : ""}</h3>
+        <section ref={ambiguitiesRef} className="war-room-ambiguities">
+            <div className="war-room-ambiguities__header">
+              <div className="war-room-ambiguities__title">
+                <span className="material-symbols-outlined">warning</span>
+                <h3>Ambiguities Detected {hasCampaign ? `(${ambiguities.length})` : ""}</h3>
+              </div>
             </div>
-          </div>
-          {hasCampaign && ambiguities.length ? (
-            <ul className="war-room-ambiguities__list">
-              {ambiguities.slice(0, 6).map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ul>
-          ) : (
+            {hasCampaign && ambiguities.length ? (
+              <ul className="war-room-ambiguities__list">
+                {ambiguities.slice(0, 6).map((item) => (
+                  <li key={item}>{capitalizeFirstLetter(item)}</li>
+                ))}
+              </ul>
+            ) : (
             <div className="war-room-empty">Source uncertainty flags from the Analytical Brain will be surfaced here.</div>
           )}
         </section>

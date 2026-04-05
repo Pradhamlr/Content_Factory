@@ -16,6 +16,23 @@ function formatTimestamp(value) {
   });
 }
 
+function toHeadlineCase(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => {
+      if (["and", "or", "the", "a", "an", "of", "for", "to", "in", "with", "by"].includes(word)) {
+        return word;
+      }
+
+      return word.charAt(0).toUpperCase() + word.slice(1);
+    })
+    .join(" ")
+    .replace(/^./, (character) => character.toUpperCase());
+}
+
 export default function CampaignsView({
   input,
   setInput,
@@ -131,7 +148,7 @@ export default function CampaignsView({
                   onClick={() => onLoadCampaign(campaign.campaignId)}
                 >
                   <div className="campaign-history__item-top">
-                    <strong>{campaign.previewTitle}</strong>
+                    <strong>{toHeadlineCase(campaign.previewTitle)}</strong>
                     <span className={`campaign-history__status is-${String(campaign.reviewStatus || campaign.status || "").toLowerCase()}`}>
                       {campaign.reviewStatus || campaign.status}
                     </span>

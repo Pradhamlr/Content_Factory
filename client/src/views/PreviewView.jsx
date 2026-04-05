@@ -98,6 +98,8 @@ function hashString(value) {
   return Math.abs(hash);
 }
 
+const PREVIEW_VISUAL_FONT = "Inter, Arial, sans-serif";
+
 function buildTopicVisualDataUrl(seedSource, variant = "desktop") {
   const seed = hashString(seedSource || "campaign-preview");
   const width = variant === "mobile" ? 1080 : 1400;
@@ -140,7 +142,7 @@ function buildTopicVisualDataUrl(seedSource, variant = "desktop") {
         <path d="M 60 ${Math.round(height * 0.8)} L ${width - 60} ${Math.round(height * 0.8)}"/>
       </g>
       <rect x="44" y="44" width="170" height="42" rx="11" fill="#4f46e5"/>
-      <text x="69" y="71" fill="#ffffff" font-family="Arial, sans-serif" font-size="20" font-weight="700">${label}</text>
+      <text x="69" y="71" fill="#ffffff" font-family="${PREVIEW_VISUAL_FONT}" font-size="20" font-weight="700">${label}</text>
     </svg>
   `;
 
