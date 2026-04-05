@@ -1,138 +1,98 @@
 # Autonomous Content Factory
 
-Minimal MVP structure for an AI-assisted content generation workflow with:
+## Project Title
+Autonomous Content Factory
 
-- `backend/`: Express + Groq API
-- `client/`: React + Vite frontend
+## The Problem
+Marketing teams often need to turn one source document into multiple channel-specific assets, but doing that manually is slow, repetitive, and inconsistent. This project addresses the challenge of transforming a single source such as text, a PDF, or a URL into a blog post, social thread, and email teaser through a guided multi-agent workflow.
 
-Once you add your Groq API key, the app is ready for basic end-to-end AI integration.
+## The Solution
+Autonomous Content Factory is a multi-agent content generation system with a production-style frontend and backend. It uses a Researcher agent to extract facts and ambiguities, a Writer agent to create channel-specific content, and an Editor agent to validate quality and factual grounding. The app supports pasted text, PDF upload with extraction, and URL ingestion, then lets users review, regenerate, approve, override, preview, and export campaign assets through a live agent-room interface.
 
-## Project Structure
+Key features:
+- Multi-source campaign ingestion: text, PDF, and URL
+- Multi-agent pipeline: Researcher, Writer, and Gatekeeper
+- Iterative review and regeneration workflow
+- Human-in-the-loop guidance and manual override
+- Final review workspace for blog, social thread, and email teaser
+- Responsive preview for desktop and mobile channels
+- Campaign persistence with Postgres
+- Artifact generation and zip export
 
-```text
-backend/
-  index.js
-  package.json
-  .env.example
-  config/
-    groq.js
-  agents/
-    researcher.js
-    writer.js
-    editor.js
-  routes/
-    generate.js
-  utils/
-    safeJson.js
+## Tech Stack
+- Languages:
+  - JavaScript
+  - Python
+- Frontend:
+  - React
+  - Vite
+  - CSS
+- Backend:
+  - Node.js
+  - Express
+- Database:
+  - PostgreSQL (Supabase Postgres)
+- APIs / SDKs / Tools:
+  - Groq API via `groq-sdk`
+  - `multer` for PDF uploads
+  - `pypdf` for PDF text extraction
+  - `jszip` for export packaging
+  - `cors`
+  - `dotenv`
 
-client/
-  index.html
-  package.json
-  vite.config.js
-  src/
-    App.jsx
-    main.jsx
-    styles.css
-```
+## Setup Instructions
 
-## What It Does
-
-The backend exposes:
-
-- `POST /api/generate`
-
-Request:
-
-```json
-{
-  "input": "Your raw source material"
-}
-```
-
-Flow:
-
-1. Research agent extracts structured facts
-2. Writer agent generates blog, tweet thread, and email teaser
-3. Editor agent validates the output
-4. If rejected, the writer retries with editor feedback
-5. Response returns facts, final content, status, feedback, and attempts
-
-The frontend provides:
-
-- source text input
-- generate button wired to the backend
-- fact extraction view
-- generated content tabs
-- editor feedback and attempt summary
-
-## Setup
-
-Install dependencies from the repo root:
+### 1. Clone and install dependencies
+Run these commands from the project root:
 
 ```bash
 npm install
+cd backend && npm install
+cd ../client && npm install
+cd ..
 ```
 
-Create your backend env file:
-
-```bash
-cd backend
-cp .env.example .env
-```
-
-Then add your Groq key in `backend/.env`:
+### 2. Configure environment variables
+Create `backend/.env` and add:
 
 ```env
-GROQ_API_KEY=your_key_here
+GROQ_API_KEY=your_groq_api_key
 GROQ_MODEL=llama-3.3-70b-versatile
 PORT=4000
+DATABASE_URL=postgresql://postgres:YOUR_PASSWORD@db.hnamuhpbjlswktowgktf.supabase.co:5432/postgres
 ```
 
-## Run
+### 3. Install Python dependency for PDF extraction
+If `pypdf` is not installed:
 
-Start the backend:
+```bash
+python -m pip install pypdf
+```
+
+### 4. Run the backend
+From the project root:
 
 ```bash
 npm run backend
 ```
 
-Start the frontend in another terminal:
+### 5. Run the frontend
+In a second terminal from the project root:
 
 ```bash
 npm run client
 ```
 
-Open:
+### 6. Open the app
+Visit:
 
 ```text
 http://localhost:5173
 ```
 
-## Build The Client
+### Optional build check
+To build the frontend:
 
 ```bash
 npm run build:client
 ```
-
-## Example API Request
-
-```bash
-curl -X POST http://localhost:4000/api/generate \
-  -H "Content-Type: application/json" \
-  -d "{\"input\":\"Our platform helps marketers turn one product update into blog posts, tweets, and email campaigns faster.\"}"
-```
-
-## Notes
-
-- `.env` files are ignored through the root `.gitignore`
-- the frontend proxies `/api` requests to `http://localhost:4000`
-- the backend defaults to `llama-3.3-70b-versatile`
-- you can override the model with `GROQ_MODEL` in `backend/.env`
-
-## Next Good Steps
-
-- add request validation middleware
-- add prompt constants or templates
-- add logging and rate-limit handling
-- persist generations in a database
-- replace plain alerts with richer UI feedback states
