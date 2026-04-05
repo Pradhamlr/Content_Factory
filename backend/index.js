@@ -7,7 +7,7 @@ import { MODEL } from "./config/groq.js";
 import { isDatabaseConfigured } from "./config/database.js";
 import { ensureCampaignSchema } from "./repositories/campaignRepository.js";
 import { toErrorResponse } from "./utils/errors.js";
-import { logEvent } from "./utils/logger.js";
+import { logEvent, systemLogFilePath } from "./utils/logger.js";
 import { logFilePath } from "./utils/agentLogger.js";
 import campaignsRouter from "./routes/campaigns.js";
 import generateRouter from "./routes/generate.js";
@@ -72,10 +72,14 @@ async function startServer() {
     console.log(`Autonomous Content Factory backend running on http://localhost:${PORT}`);
     console.log(`Groq model: ${MODEL}`);
     console.log(`Agent logs: ${logFilePath}`);
+    console.log(`System logs: ${systemLogFilePath}`);
   });
 }
 
 startServer().catch((error) => {
+  logEvent("startup_error", {
+    message: error.message || "Failed to start backend"
+  });
   console.error("Failed to start backend:", error);
   process.exit(1);
 });
