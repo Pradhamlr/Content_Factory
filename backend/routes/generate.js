@@ -12,7 +12,13 @@ import { AppError, badRequest, notFound, timeoutError } from "../utils/errors.js
 import { extractPdfText } from "../utils/pdfExtractor.js";
 import { logEvent } from "../utils/logger.js";
 import { getCampaignByRequestId, saveCampaign } from "../repositories/campaignRepository.js";
-import { appendRevision, buildCampaignState, createEmptyRevisionHistory, createSourceDescriptor } from "../utils/campaignState.js";
+import {
+  appendRevision,
+  buildCampaignState,
+  createEmptyApprovalMeta,
+  createEmptyRevisionHistory,
+  createSourceDescriptor
+} from "../utils/campaignState.js";
 import { requireNonEmptyString, requireObject, requireOneOf } from "../utils/validation.js";
 import { extractUrlText } from "../utils/urlExtractor.js";
 
@@ -28,9 +34,11 @@ const upload = multer({
   }
 });
 const approvalStore = new Map();
+const approvalMetaStore = new Map();
 const deploymentStore = new Map();
 const resultStore = new Map();
 const requestToCampaignStore = new Map();
+const instructionStore = new Map();
 
 function createDefaultApprovals() {
   return {
@@ -48,6 +56,14 @@ function createDefaultDeployment() {
   };
 }
 
+function createOperatorInstruction(message) {
+  return {
+    id: crypto.randomUUID(),
+    timestamp: new Date().toISOString(),
+    message: String(message || "").trim()
+  };
+}
+
 function cacheCampaign(payload) {
   if (!payload?.requestId) {
     return payload;
@@ -58,7 +74,9 @@ function cacheCampaign(payload) {
     requestToCampaignStore.set(payload.campaignId, payload.requestId);
   }
   approvalStore.set(payload.requestId, payload.approvals || createDefaultApprovals());
+  approvalMetaStore.set(payload.requestId, payload.approvalMeta || createEmptyApprovalMeta());
   deploymentStore.set(payload.requestId, payload.deployment || createDefaultDeployment());
+  instructionStore.set(payload.requestId, Array.isArray(payload.manualInstructions) ? payload.manualInstructions : []);
 
   return payload;
 }
@@ -71,7 +89,9 @@ function removeCachedCampaign(payload) {
   if (payload.requestId) {
     resultStore.delete(payload.requestId);
     approvalStore.delete(payload.requestId);
+    approvalMetaStore.delete(payload.requestId);
     deploymentStore.delete(payload.requestId);
+    instructionStore.delete(payload.requestId);
   }
 
   if (payload.campaignId) {
@@ -188,6 +208,19 @@ function getApprovals(requestId) {
 
 function getDeployment(requestId) {
   return deploymentStore.get(requestId) || createDefaultDeployment();
+}
+
+function getApprovalMeta(requestId) {
+  return approvalMetaStore.get(requestId) || createEmptyApprovalMeta();
+}
+
+function getManualInstructions(requestId) {
+  return instructionStore.get(requestId) || [];
+}
+
+function getLatestOperatorGuidance(requestId) {
+  const instructions = getManualInstructions(requestId);
+  return instructions.length ? instructions[instructions.length - 1].message : "";
 }
 
 async function getStoredResult(requestId) {
@@ -382,7 +415,17 @@ async function runCampaignPipeline(input, requestId, source = createSourceDescri
     await delay(500);
 
     const writerStartedAt = startTimer();
-    const draft = await runWithRecovery("Writer", requestId, () => writerAgent(facts, feedback, { requestId }));
+    const operatorGuidance = getLatestOperatorGuidance(requestId);
+    if (operatorGuidance) {
+      publish(requestId, "attempt", {
+        requestId,
+        attempt: attempts,
+        message: "Operator guidance is being applied to the next draft cycle."
+      });
+    }
+    const draft = await runWithRecovery("Writer", requestId, () =>
+      writerAgent(facts, feedback, { requestId, operatorGuidance })
+    );
     stageTimings.writerMs += endTimer(writerStartedAt);
     await delay(UX_DELAY_MS);
 
@@ -392,7 +435,8 @@ async function runCampaignPipeline(input, requestId, source = createSourceDescri
         requestId,
         attempt: attempts,
         maxAttempts: MAX_RETRIES + 1,
-        previousFeedback: feedback
+        previousFeedback: feedback,
+        operatorGuidance
       })
     );
     stageTimings.editorMs += endTimer(editorStartedAt);
@@ -425,6 +469,7 @@ async function runCampaignPipeline(input, requestId, source = createSourceDescri
     status: finalReview?.status || "REJECTED",
     reviewStatus: finalReview?.status || "REJECTED",
     approvals: getApprovals(requestId),
+    approvalMeta: getApprovalMeta(requestId),
     deployment: getDeployment(requestId),
     telemetry: {
       requestStartedAt: new Date(requestStartedAt).toISOString(),
@@ -441,6 +486,7 @@ async function runCampaignPipeline(input, requestId, source = createSourceDescri
 
   payload.attempts = attempts;
   payload.feedback = finalReview?.feedback || "";
+  payload.manualInstructions = getManualInstructions(requestId);
 
   const savedPayload = await saveCampaign(payload);
   cacheCampaign(savedPayload || payload);
@@ -706,14 +752,16 @@ router.post("/regenerate", async (req, res, next) => {
         : `Regenerate only the ${channelLabel}. Keep every claim grounded in the provided facts and improve specificity, clarity, and structure for this one asset.`;
 
     const { payload, nextStoredCampaign } = await withActionLock(`regenerate:${requestId}:${channel}`, async () => {
-      const draft = await runWithRecovery("Writer", requestId, () => writerAgent(facts, feedback, { requestId }));
+      const operatorGuidance = getLatestOperatorGuidance(requestId);
+      const draft = await runWithRecovery("Writer", requestId, () => writerAgent(facts, feedback, { requestId, operatorGuidance }));
       await delay(UX_DELAY_MS);
       const review = await runWithRecovery("Editor", requestId, () =>
         editorAgent(draft, facts, {
           requestId,
           attempt: 1,
           maxAttempts: 1,
-          previousFeedback: feedback
+          previousFeedback: feedback,
+          operatorGuidance
         })
       );
 
@@ -725,6 +773,18 @@ router.post("/regenerate", async (req, res, next) => {
               [channel]: false
             }
           : previousApprovals;
+      const previousApprovalMeta = existing?.approvalMeta || getApprovalMeta(requestId);
+      const nextApprovalMeta = review.status === "APPROVED"
+        ? {
+            ...previousApprovalMeta,
+            [channel]: {
+              approved: false,
+              type: null,
+              note: "",
+              approvedAt: null
+            }
+          }
+        : previousApprovalMeta;
       const preservedPrevious = review.status !== "APPROVED" && hadApprovedBaseline;
       const content = preservedPrevious
         ? normalizeCampaignContent(existing.content)
@@ -732,6 +792,7 @@ router.post("/regenerate", async (req, res, next) => {
       const campaignStatus = preservedPrevious ? existing.status : review.status;
 
       approvalStore.set(requestId, nextApprovals);
+      approvalMetaStore.set(requestId, nextApprovalMeta);
 
       const payload = {
         campaignId: existing?.campaignId || requestId,
@@ -747,6 +808,7 @@ router.post("/regenerate", async (req, res, next) => {
         approved: review.status === "APPROVED",
         preservedPrevious,
         approvals: nextApprovals,
+        approvalMeta: nextApprovalMeta,
         deployment: previousDeployment,
         telemetry: preservedPrevious
           ? existing?.telemetry || {}
@@ -760,7 +822,8 @@ router.post("/regenerate", async (req, res, next) => {
           preservedPrevious,
           feedback: review.feedback || "",
           content: reviewedContent
-        })
+        }),
+        manualInstructions: getManualInstructions(requestId)
       };
 
       const nextStoredCampaign = {
@@ -770,9 +833,11 @@ router.post("/regenerate", async (req, res, next) => {
         status: campaignStatus,
         feedback: preservedPrevious ? existing?.feedback || "" : review.feedback || "",
         approvals: nextApprovals,
+        approvalMeta: nextApprovalMeta,
         deployment: previousDeployment,
         telemetry: payload.telemetry,
-        revisionHistory: payload.revisionHistory
+        revisionHistory: payload.revisionHistory,
+        manualInstructions: payload.manualInstructions
       };
 
       return { payload, nextStoredCampaign };
@@ -805,8 +870,18 @@ router.post("/approve", async (req, res, next) => {
     ...getApprovals(requestId),
     [channel]: true
   };
+  const approvalMeta = {
+    ...getApprovalMeta(requestId),
+    [channel]: {
+      approved: true,
+      type: "editor",
+      note: "Approved after Gatekeeper review.",
+      approvedAt: new Date().toISOString()
+    }
+  };
 
   approvalStore.set(requestId, approvals);
+  approvalMetaStore.set(requestId, approvalMeta);
 
   const existing = await getStoredResult(requestId);
   if (!existing) {
@@ -816,6 +891,7 @@ router.post("/approve", async (req, res, next) => {
   const nextStoredCampaign = {
     ...existing,
     approvals,
+    approvalMeta,
     reviewStatus: existing.reviewStatus || existing.status
   };
 
@@ -831,8 +907,113 @@ router.post("/approve", async (req, res, next) => {
   res.json({
     requestId,
     channel,
-    approvals
+    approvals,
+    approvalMeta
   });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/manual-override", async (req, res, next) => {
+  try {
+    const requestId = requireNonEmptyString(req.body?.requestId, "requestId");
+    const channel = requireOneOf(req.body?.channel, "channel", ["blog", "tweets", "email"]);
+    const note = requireNonEmptyString(req.body?.note, "note");
+    assertUnlocked([`generate:${requestId}`, `pipeline:${requestId}`, `deploy:${requestId}`]);
+
+    const existing = await getStoredResult(requestId);
+    if (!existing) {
+      throw notFound("Campaign not found.");
+    }
+
+    const approvals = {
+      ...getApprovals(requestId),
+      [channel]: true
+    };
+    const approvalMeta = {
+      ...getApprovalMeta(requestId),
+      [channel]: {
+        approved: true,
+        type: "manual",
+        note,
+        approvedAt: new Date().toISOString()
+      }
+    };
+
+    approvalStore.set(requestId, approvals);
+    approvalMetaStore.set(requestId, approvalMeta);
+
+    const nextRevisionHistory = appendRevision(existing.revisionHistory || createEmptyRevisionHistory(), channel, {
+      reviewStatus: "MANUAL_OVERRIDE",
+      campaignStatus: existing.status,
+      preservedPrevious: false,
+      feedback: note,
+      content: existing.content
+    });
+
+    const nextStoredCampaign = {
+      ...existing,
+      approvals,
+      approvalMeta,
+      revisionHistory: nextRevisionHistory
+    };
+
+    const savedCampaign = await saveCampaign(nextStoredCampaign);
+    cacheCampaign(savedCampaign || nextStoredCampaign);
+
+    logEvent("campaign_manual_override", {
+      requestId,
+      campaignId: existing.campaignId,
+      channel
+    });
+
+    res.json({
+      requestId,
+      channel,
+      approvals,
+      approvalMeta,
+      revisionHistory: nextRevisionHistory
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/operator-input", async (req, res, next) => {
+  try {
+    const requestId = requireNonEmptyString(req.body?.requestId, "requestId");
+    const message = requireNonEmptyString(req.body?.message, "message");
+    const nextInstruction = createOperatorInstruction(message);
+    const instructions = [...getManualInstructions(requestId), nextInstruction];
+
+    instructionStore.set(requestId, instructions);
+
+    const existing = await getStoredResult(requestId);
+    if (existing) {
+      const nextStoredCampaign = {
+        ...existing,
+        manualInstructions: instructions
+      };
+      const savedCampaign = await saveCampaign(nextStoredCampaign);
+      cacheCampaign(savedCampaign || nextStoredCampaign);
+    }
+
+    publish(requestId, "attempt", {
+      requestId,
+      attempt: "operator",
+      message: "Operator guidance received and queued for the next draft or review cycle."
+    });
+
+    logEvent("campaign_operator_input", {
+      requestId,
+      message
+    });
+
+    res.json({
+      requestId,
+      manualInstructions: instructions
+    });
   } catch (error) {
     next(error);
   }

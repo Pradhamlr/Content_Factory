@@ -54,7 +54,8 @@ export async function editorAgent(content, facts, context = {}) {
           maxAttempts: context.maxAttempts || 1,
           facts,
           content,
-          previousFeedback: context.previousFeedback || ""
+          previousFeedback: context.previousFeedback || "",
+          operatorGuidance: context.operatorGuidance || ""
         })
       }
     ]

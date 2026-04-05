@@ -35,6 +35,11 @@ export default function App() {
     tweets: false,
     email: false
   });
+  const [approvalMeta, setApprovalMeta] = useState({
+    blog: { approved: false, type: null, note: "", approvedAt: null },
+    tweets: { approved: false, type: null, note: "", approvedAt: null },
+    email: { approved: false, type: null, note: "", approvedAt: null }
+  });
   const [reviewActionState, setReviewActionState] = useState(null);
   const [reviewActionLoading, setReviewActionLoading] = useState(false);
   const [deployment, setDeployment] = useState({
@@ -72,6 +77,11 @@ export default function App() {
       tweets: false,
       email: false
     });
+    setApprovalMeta({
+      blog: { approved: false, type: null, note: "", approvedAt: null },
+      tweets: { approved: false, type: null, note: "", approvedAt: null },
+      email: { approved: false, type: null, note: "", approvedAt: null }
+    });
     setDeployment({
       deployed: false,
       deployedAt: null,
@@ -91,6 +101,13 @@ export default function App() {
         blog: false,
         tweets: false,
         email: false
+      }
+    );
+    setApprovalMeta(
+      payload?.approvalMeta || {
+        blog: { approved: false, type: null, note: "", approvedAt: null },
+        tweets: { approved: false, type: null, note: "", approvedAt: null },
+        email: { approved: false, type: null, note: "", approvedAt: null }
       }
     );
     setDeployment(
@@ -418,7 +435,12 @@ export default function App() {
         ...current,
         content: payload.content,
         status: payload.status || current?.status || "REJECTED",
-        feedback: payload.feedback || current?.feedback || ""
+        feedback: payload.feedback || current?.feedback || "",
+        reviewStatus: payload.reviewStatus || current?.reviewStatus || current?.status,
+        approvalMeta: payload.approvalMeta || current?.approvalMeta,
+        manualInstructions: payload.manualInstructions || current?.manualInstructions,
+        revisionHistory: payload.revisionHistory || current?.revisionHistory,
+        telemetry: payload.telemetry || current?.telemetry
       }));
       setReviewActionState({
         type: "regenerate",
@@ -458,6 +480,11 @@ export default function App() {
         blog: false,
         tweets: false,
         email: false
+      });
+      setApprovalMeta(payload.approvalMeta || {
+        blog: { approved: false, type: null, note: "", approvedAt: null },
+        tweets: { approved: false, type: null, note: "", approvedAt: null },
+        email: { approved: false, type: null, note: "", approvedAt: null }
       });
       setDeployment(payload.deployment || {
         deployed: false,
@@ -505,6 +532,11 @@ export default function App() {
         tweets: false,
         email: false
       });
+      setApprovalMeta(payload.approvalMeta || {
+        blog: { approved: false, type: null, note: "", approvedAt: null },
+        tweets: { approved: false, type: null, note: "", approvedAt: null },
+        email: { approved: false, type: null, note: "", approvedAt: null }
+      });
       setReviewActionState({
         type: "approval",
         channel,
@@ -524,11 +556,94 @@ export default function App() {
         current
           ? {
               ...current,
-              approvals: payload.approvals || current.approvals
+              approvals: payload.approvals || current.approvals,
+              approvalMeta: payload.approvalMeta || current.approvalMeta
             }
           : current
       );
       await refreshSavedCampaigns();
+    } catch (nextError) {
+      setError(nextError.message);
+      showToast(nextError.message, "error", 5600, "warning");
+    }
+  }
+
+  async function handleManualOverride(channel, note) {
+    if (!requestId || !note.trim() || reviewActionLoading) {
+      return;
+    }
+
+    setReviewActionLoading(true);
+    setError("");
+
+    try {
+      const payload = await api("/api/generate/manual-override", {
+        method: "POST",
+        body: JSON.stringify({
+          requestId,
+          channel,
+          note: note.trim()
+        })
+      });
+
+      setApprovedTabs(payload.approvals || {
+        blog: false,
+        tweets: false,
+        email: false
+      });
+      setApprovalMeta(payload.approvalMeta || {
+        blog: { approved: false, type: null, note: "", approvedAt: null },
+        tweets: { approved: false, type: null, note: "", approvedAt: null },
+        email: { approved: false, type: null, note: "", approvedAt: null }
+      });
+      setResult((current) =>
+        current
+          ? {
+              ...current,
+              approvals: payload.approvals || current.approvals,
+              approvalMeta: payload.approvalMeta || current.approvalMeta,
+              revisionHistory: payload.revisionHistory || current.revisionHistory
+            }
+          : current
+      );
+      appendLog(
+        `Manual override applied to ${channel === "tweets" ? "Social Thread" : channel === "email" ? "Email Teaser" : "Blog Post"}.`,
+        "system"
+      );
+      showToast("Manual override saved.", "approved", 3600, "verified");
+      await refreshSavedCampaigns();
+    } catch (nextError) {
+      setError(nextError.message);
+      showToast(nextError.message, "error", 5600, "warning");
+    } finally {
+      setReviewActionLoading(false);
+    }
+  }
+
+  async function handleOperatorInput(message) {
+    if (!requestId || !message.trim()) {
+      return;
+    }
+
+    try {
+      const payload = await api("/api/generate/operator-input", {
+        method: "POST",
+        body: JSON.stringify({
+          requestId,
+          message: message.trim()
+        })
+      });
+
+      setResult((current) =>
+        current
+          ? {
+              ...current,
+              manualInstructions: payload.manualInstructions || current.manualInstructions
+            }
+          : current
+      );
+      appendLog(`Operator guidance received: ${message.trim()}`, "system");
+      showToast("Operator guidance queued for the next draft/review cycle.", "approved", 3400, "terminal");
     } catch (nextError) {
       setError(nextError.message);
       showToast(nextError.message, "error", 5600, "warning");
@@ -649,6 +764,7 @@ export default function App() {
               hasCampaign={hasCampaign}
               deployment={deployment}
               onArtifactOpen={handleArtifactOpen}
+              onSubmitOperatorInput={handleOperatorInput}
             />
           ) : null}
 
@@ -659,8 +775,10 @@ export default function App() {
               onExport={downloadResultJson}
               hasCampaign={hasCampaign}
               approvedTabs={approvedTabs}
+              approvalMeta={approvalMeta}
               onApproveChannel={handleApproveChannel}
               onRegenerateChannel={handleRegenerateChannel}
+              onManualOverride={handleManualOverride}
               actionLoading={reviewActionLoading}
               actionState={reviewActionState}
             />

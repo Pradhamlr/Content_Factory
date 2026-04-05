@@ -15,9 +15,11 @@ function normalizeCampaignRow(row) {
     status: row.status,
     reviewStatus: row.review_status,
     approvals: row.approvals,
+    approvalMeta: row.approval_meta,
     deployment: row.deployment,
     telemetry: row.telemetry,
-    revisionHistory: row.revision_history
+    revisionHistory: row.revision_history,
+    manualInstructions: row.manual_instructions
   });
 
   payload.feedback = row.feedback || "";
@@ -66,9 +68,11 @@ export async function ensureCampaignSchema() {
       status TEXT NOT NULL,
       review_status TEXT NOT NULL,
       approvals JSONB NOT NULL DEFAULT '{}'::jsonb,
+      approval_meta JSONB NOT NULL DEFAULT '{}'::jsonb,
       deployment JSONB NOT NULL DEFAULT '{}'::jsonb,
       telemetry JSONB NOT NULL DEFAULT '{}'::jsonb,
       revision_history JSONB NOT NULL DEFAULT '{}'::jsonb,
+      manual_instructions JSONB NOT NULL DEFAULT '[]'::jsonb,
       feedback TEXT NOT NULL DEFAULT '',
       attempts INTEGER NOT NULL DEFAULT 0,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -79,6 +83,16 @@ export async function ensureCampaignSchema() {
   await pool.query(`
     CREATE INDEX IF NOT EXISTS campaigns_updated_at_idx
     ON campaigns (updated_at DESC);
+  `);
+
+  await pool.query(`
+    ALTER TABLE campaigns
+    ADD COLUMN IF NOT EXISTS approval_meta JSONB NOT NULL DEFAULT '{}'::jsonb;
+  `);
+
+  await pool.query(`
+    ALTER TABLE campaigns
+    ADD COLUMN IF NOT EXISTS manual_instructions JSONB NOT NULL DEFAULT '[]'::jsonb;
   `);
 
   return true;
@@ -99,15 +113,17 @@ export async function saveCampaign(payload) {
       status,
       review_status,
       approvals,
+      approval_meta,
       deployment,
       telemetry,
       revision_history,
+      manual_instructions,
       feedback,
       attempts,
       created_at,
       updated_at
     ) VALUES (
-      $1, $2, $3::jsonb, $4::jsonb, $5::jsonb, $6, $7, $8::jsonb, $9::jsonb, $10::jsonb, $11::jsonb, $12, $13, NOW(), NOW()
+      $1, $2, $3::jsonb, $4::jsonb, $5::jsonb, $6, $7, $8::jsonb, $9::jsonb, $10::jsonb, $11::jsonb, $12::jsonb, $13::jsonb, $14, $15, NOW(), NOW()
     )
     ON CONFLICT (campaign_id) DO UPDATE SET
       request_id = EXCLUDED.request_id,
@@ -117,9 +133,11 @@ export async function saveCampaign(payload) {
       status = EXCLUDED.status,
       review_status = EXCLUDED.review_status,
       approvals = EXCLUDED.approvals,
+      approval_meta = EXCLUDED.approval_meta,
       deployment = EXCLUDED.deployment,
       telemetry = EXCLUDED.telemetry,
       revision_history = EXCLUDED.revision_history,
+      manual_instructions = EXCLUDED.manual_instructions,
       feedback = EXCLUDED.feedback,
       attempts = EXCLUDED.attempts,
       updated_at = NOW()
@@ -135,9 +153,11 @@ export async function saveCampaign(payload) {
     payload.status || "PENDING",
     payload.reviewStatus || payload.status || "PENDING",
     JSON.stringify(payload.approvals || {}),
+    JSON.stringify(payload.approvalMeta || {}),
     JSON.stringify(payload.deployment || {}),
     JSON.stringify(payload.telemetry || {}),
     JSON.stringify(payload.revisionHistory || {}),
+    JSON.stringify(payload.manualInstructions || []),
     payload.feedback || "",
     payload.attempts || 0
   ];

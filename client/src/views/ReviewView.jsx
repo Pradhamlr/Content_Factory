@@ -255,13 +255,17 @@ export default function ReviewView({
   onExport,
   hasCampaign,
   approvedTabs,
+  approvalMeta,
   onApproveChannel,
   onRegenerateChannel,
+  onManualOverride,
   actionLoading,
   actionState
 }) {
   const [activeTab, setActiveTab] = useState("blog");
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [overrideOpen, setOverrideOpen] = useState(false);
+  const [overrideNote, setOverrideNote] = useState("");
 
   const sourceText = hasCampaign ? input?.trim() || "" : "";
   const content = result?.content || {};
@@ -270,6 +274,7 @@ export default function ReviewView({
   const qualityScore = !hasCampaign ? "--" : result?.telemetry?.quality?.score ?? "--";
   const activeMeta = tabConfig.find((tab) => tab.key === activeTab) || tabConfig[0];
   const isApproved = Boolean(approvedTabs?.[activeTab]);
+  const activeApprovalMeta = approvalMeta?.[activeTab] || { approved: false, type: null, note: "", approvedAt: null };
   const activeRevisions = Array.isArray(result?.revisionHistory?.[activeTab]) ? [...result.revisionHistory[activeTab]].reverse() : [];
 
   const contentPanel = useMemo(() => {
@@ -382,6 +387,7 @@ export default function ReviewView({
                         <span>Campaign: {entry.campaignStatus || "--"}</span>
                         <span>{entry.preservedPrevious ? "Previous approved version retained" : "New draft evaluated"}</span>
                       </div>
+                      {entry.reviewStatus === "MANUAL_OVERRIDE" ? <div className="review-history__manual-tag">Manual override</div> : null}
                       {entry.feedback ? <p>{entry.feedback}</p> : null}
                     </article>
                   ))}
@@ -394,6 +400,12 @@ export default function ReviewView({
 
           <div className="review-content__footer">
             <div className="review-content__footer-actions">
+              {isApproved ? (
+                <div className={`review-content__success-pill ${activeApprovalMeta.type === "manual" ? "is-manual" : ""}`}>
+                  <span className="material-symbols-outlined">{activeApprovalMeta.type === "manual" ? "edit_note" : "verified"}</span>
+                  <span>{activeApprovalMeta.type === "manual" ? "Manual Override" : "Editor Approved"}</span>
+                </div>
+              ) : null}
               {!isApproved ? (
               <button
                 type="button"
@@ -404,6 +416,17 @@ export default function ReviewView({
                 <span className="material-symbols-outlined">refresh</span>
                 <span>{actionLoading ? "Regenerating..." : `Regenerate ${activeMeta.label}`}</span>
               </button>
+              ) : null}
+              {!isApproved && isRejected ? (
+                <button
+                  type="button"
+                  className="review-content__secondary"
+                  onClick={() => setOverrideOpen(true)}
+                  disabled={!hasCampaign || actionLoading}
+                >
+                  <span className="material-symbols-outlined">edit_note</span>
+                  <span>Manual Override</span>
+                </button>
               ) : null}
               <button
                 type="button"
@@ -418,6 +441,47 @@ export default function ReviewView({
           </div>
         </section>
       </div>
+
+      {overrideOpen ? (
+        <div className="review-override-backdrop" role="presentation">
+          <div className="review-override-modal" role="dialog" aria-modal="true" aria-labelledby="override-title">
+            <div className="review-override-modal__header">
+              <div>
+                <div className="review-override-modal__eyebrow">Human Review Override</div>
+                <h3 id="override-title">Manually approve {activeMeta.label}</h3>
+                <p>Record why this channel should be accepted even though the Gatekeeper rejected it.</p>
+              </div>
+              <button type="button" className="review-override-modal__close" onClick={() => setOverrideOpen(false)} aria-label="Close override modal">
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            <textarea
+              className="review-override-modal__textarea"
+              value={overrideNote}
+              onChange={(event) => setOverrideNote(event.target.value)}
+              placeholder="Add a short reviewer note explaining why this content is acceptable."
+              rows={6}
+            />
+            <div className="review-override-modal__actions">
+              <button type="button" className="review-override-modal__secondary" onClick={() => setOverrideOpen(false)}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="review-override-modal__primary"
+                disabled={!overrideNote.trim() || actionLoading}
+                onClick={async () => {
+                  await onManualOverride?.(activeTab, overrideNote.trim());
+                  setOverrideNote("");
+                  setOverrideOpen(false);
+                }}
+              >
+                Save Override
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }

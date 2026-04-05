@@ -18,6 +18,52 @@ export function createEmptyRevisionHistory() {
   };
 }
 
+export function createEmptyApprovalMeta() {
+  return {
+    blog: {
+      approved: false,
+      type: null,
+      note: "",
+      approvedAt: null
+    },
+    tweets: {
+      approved: false,
+      type: null,
+      note: "",
+      approvedAt: null
+    },
+    email: {
+      approved: false,
+      type: null,
+      note: "",
+      approvedAt: null
+    }
+  };
+}
+
+export function normalizeApprovalMeta(meta = {}) {
+  const base = createEmptyApprovalMeta();
+
+  for (const channel of Object.keys(base)) {
+    const entry = meta?.[channel];
+
+    if (entry && typeof entry === "object") {
+      base[channel] = {
+        approved: Boolean(entry.approved),
+        type: entry.type || null,
+        note: entry.note || "",
+        approvedAt: entry.approvedAt || null
+      };
+    }
+  }
+
+  return base;
+}
+
+export function normalizeManualInstructions(instructions = []) {
+  return Array.isArray(instructions) ? instructions.filter((item) => item && typeof item === "object" && item.message) : [];
+}
+
 export function normalizeRevisionHistory(history = {}) {
   return {
     blog: Array.isArray(history.blog) ? history.blog : [],
@@ -54,9 +100,11 @@ export function buildCampaignState({
   status = "PROCESSING",
   reviewStatus = "PENDING",
   approvals,
+  approvalMeta,
   deployment,
   telemetry = {},
-  revisionHistory
+  revisionHistory,
+  manualInstructions = []
 }) {
   return {
     campaignId: campaignId || requestId,
@@ -71,12 +119,14 @@ export function buildCampaignState({
       tweets: false,
       email: false
     },
+    approvalMeta: normalizeApprovalMeta(approvalMeta),
     deployment: deployment || {
       deployed: false,
       deployedAt: null,
       deployedChannels: []
     },
     telemetry,
-    revisionHistory: normalizeRevisionHistory(revisionHistory)
+    revisionHistory: normalizeRevisionHistory(revisionHistory),
+    manualInstructions: normalizeManualInstructions(manualInstructions)
   };
 }

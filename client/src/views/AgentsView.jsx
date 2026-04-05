@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 function formatStatus(status) {
   return String(status || "idle").replace(/_/g, " ").toUpperCase();
 }
@@ -175,7 +177,8 @@ function AgentCard({ title, status, active, complete, blocked, accent }) {
   );
 }
 
-export default function AgentsView({ liveLogs, agentStages, loading, result, hasCampaign, deployment, onArtifactOpen }) {
+export default function AgentsView({ liveLogs, agentStages, loading, result, hasCampaign, deployment, onArtifactOpen, onSubmitOperatorInput }) {
+  const [operatorInput, setOperatorInput] = useState("");
   const logs = liveLogs.length
     ? liveLogs
     : loading
@@ -208,6 +211,9 @@ export default function AgentsView({ liveLogs, agentStages, loading, result, has
     channels: Array.isArray(deployment?.deployedChannels) ? deployment.deployedChannels : [],
     deployedAt: deployment?.deployedAt || null
   };
+  const latestOperatorNote = Array.isArray(result?.manualInstructions) && result.manualInstructions.length
+    ? result.manualInstructions[result.manualInstructions.length - 1]
+    : null;
 
   const researcherStatus = agentStages.researcher.status;
   const writerStatus = agentStages.writer.status;
@@ -290,11 +296,41 @@ export default function AgentsView({ liveLogs, agentStages, loading, result, has
 
           <div className="war-room-stream__input">
             <span className="war-room-stream__input-label">OVERRIDE CMD:</span>
-            <span className="war-room-stream__input-placeholder">ENTER SYSTEM OVERRIDE OR FEEDBACK...</span>
-            <button type="button" className="war-room-stream__input-button" aria-label="Send override">
+            <input
+              className="war-room-stream__input-field"
+              value={operatorInput}
+              onChange={(event) => setOperatorInput(event.target.value)}
+              placeholder="ENTER SYSTEM OVERRIDE OR FEEDBACK..."
+            />
+            <button
+              type="button"
+              className="war-room-stream__input-button"
+              aria-label="Send override"
+              disabled={!hasCampaign || !operatorInput.trim()}
+              onClick={() => {
+                const message = operatorInput.trim();
+
+                if (!message) {
+                  return;
+                }
+
+                onSubmitOperatorInput?.(message);
+                setOperatorInput("");
+              }}
+            >
               <span className="material-symbols-outlined">terminal</span>
             </button>
           </div>
+
+          {latestOperatorNote ? (
+            <div className="war-room-stream__operator-note">
+              <span className="material-symbols-outlined">rule</span>
+              <div>
+                <strong>Latest operator guidance</strong>
+                <p>{latestOperatorNote.message}</p>
+              </div>
+            </div>
+          ) : null}
         </section>
 
         <div className="war-room-intelligence-grid">

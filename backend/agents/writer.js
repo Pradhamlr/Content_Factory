@@ -28,6 +28,7 @@ export async function writerAgent(facts, feedback = "", context = {}) {
 ${JSON.stringify(facts, null, 2)}
 
 ${feedback ? `Fix based on this feedback: ${feedback}` : ""}
+${context.operatorGuidance ? `Operator guidance to follow where possible without violating the facts: ${context.operatorGuidance}` : ""}
 
 Return structured JSON:
 {
