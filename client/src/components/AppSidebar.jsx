@@ -31,7 +31,7 @@ export default function AppSidebar({ activeView, onChange }) {
       </nav>
 
       <div className="app-sidebar__footer">
-        <button type="button" className="app-sidebar__new-button">
+        <button type="button" className="app-sidebar__new-button" onClick={() => onChange("campaigns")}>
           <span className="material-symbols-outlined" aria-hidden="true">add</span>
           <span>New Campaign</span>
         </button>

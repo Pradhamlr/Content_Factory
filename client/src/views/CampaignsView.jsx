@@ -93,7 +93,6 @@ export default function CampaignsView({
               <span className="material-symbols-outlined" aria-hidden="true">link</span>
               <span>URL</span>
             </button>
-            <span><span className="material-symbols-outlined" aria-hidden="true">mic</span>AUDIO</span>
           </div>
 
           {selectedFile ? (
@@ -117,14 +116,16 @@ export default function CampaignsView({
 
           <div className="campaign-uploader__actions">
             <button type="button" className="campaign-primary-button" onClick={onGenerate} disabled={loading}>
-              {loading ? "Generating..." : "Start Campaign"}
+              <span>{loading ? "Generating..." : "Start Campaign"}</span>
+              <small>Upload or paste content to begin pipeline execution</small>
             </button>
             <button
               type="button"
               className="campaign-secondary-button"
               onClick={onLoadDemo}
             >
-              Load Demo
+              <span>Load Demo</span>
+              <small>Preview a pre-generated campaign workflow</small>
             </button>
           </div>
         </div>
@@ -174,7 +175,11 @@ export default function CampaignsView({
               ))}
             </div>
           ) : (
-            <div className="campaign-history__empty">No saved campaigns yet. Start one from text, PDF, or URL.</div>
+            <div className="campaign-history__empty">
+              <strong>No Saved Campaigns</strong>
+              <p>Saved campaign runs appear here for quick re-entry into review, preview, and export workflows.</p>
+              <span>Start one from text, PDF, or URL.</span>
+            </div>
           )}
         </section>
       </section>

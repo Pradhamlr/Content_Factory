@@ -130,7 +130,13 @@ function getEmailParts(email = "") {
 }
 
 function EmptyReviewState() {
-  return <div className="review-empty">Generated content will appear here after the campaign finishes.</div>;
+  return (
+    <div className="review-empty">
+      <strong>No Output Yet</strong>
+      <p>This panel displays the current channel output in its final review format.</p>
+      <span>Finish a campaign run to populate this section.</span>
+    </div>
+  );
 }
 
 function BlogReview({ blog, facts }) {
@@ -318,6 +324,11 @@ export default function ReviewView({
             <div className="review-source__badge">Read-Only</div>
           </div>
 
+          <div className="review-source__helper">
+            <strong>Reference Material</strong>
+            <p>Source content used to generate campaign outputs.</p>
+          </div>
+
           <div className="review-source__body">
             {hasCampaign ? (
               <>
@@ -332,12 +343,23 @@ export default function ReviewView({
                 </div>
               </>
             ) : (
-              <div className="review-empty">Paste source content and start a campaign to unlock the final review workspace.</div>
+              <div className="review-empty">
+                <strong>No Reference Material</strong>
+                <p>Source content used to generate campaign outputs will appear here for side-by-side review.</p>
+                <span>Start a campaign from the Campaigns page to unlock this workspace.</span>
+              </div>
             )}
           </div>
         </section>
 
         <section className="review-content">
+          {hasCampaign && result?.status === "APPROVED" ? (
+            <div className="review-content__approval-banner">
+              <strong>Campaign Approved</strong>
+              <p>All assets are ready for final review and export.</p>
+            </div>
+          ) : null}
+
           <div className="review-content__tabs">
             <div className="review-content__tab-group">
               <div className="review-content__tab-list">
@@ -393,7 +415,11 @@ export default function ReviewView({
                   ))}
                 </div>
               ) : (
-                <div className="review-empty review-empty--compact">This channel has not been revised yet. Regenerations will appear here as a traceable review timeline.</div>
+                <div className="review-empty review-empty--compact">
+                  <strong>No Revisions Yet</strong>
+                  <p>This timeline tracks targeted rewrites and approval changes for the active channel.</p>
+                  <span>Regenerate a channel to create the first revision entry.</span>
+                </div>
               )
             ) : null}
           </section>

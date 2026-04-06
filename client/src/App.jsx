@@ -47,7 +47,6 @@ export default function App() {
     deployedAt: null,
     deployedChannels: []
   });
-  const [previewActionLoading, setPreviewActionLoading] = useState(false);
   const [savedCampaigns, setSavedCampaigns] = useState([]);
   const [campaignsLoading, setCampaignsLoading] = useState(false);
   const eventSourceRef = useRef(null);
@@ -546,7 +545,7 @@ export default function App() {
         type: "approval",
         channel,
         status: "approved",
-        message: `${channel === "tweets" ? "Social Thread" : channel === "email" ? "Email Teaser" : "Blog Post"} approved and ready for export or deployment.`
+        message: `${channel === "tweets" ? "Social Thread" : channel === "email" ? "Email Teaser" : "Blog Post"} approved and ready for final review and export.`
       });
       showToast(
         `${channel === "tweets" ? "Social Thread" : channel === "email" ? "Email Teaser" : "Blog Post"} approved.`,
@@ -664,43 +663,6 @@ export default function App() {
     }
   }
 
-  async function handleDeployCampaign() {
-    if (!requestId || previewActionLoading) {
-      return;
-    }
-
-    setPreviewActionLoading(true);
-    setError("");
-
-    try {
-      const payload = await api("/api/generate/deploy", {
-        method: "POST",
-        body: JSON.stringify({ requestId })
-      });
-
-      setDeployment(payload.deployment || {
-        deployed: false,
-        deployedAt: null,
-        deployedChannels: []
-      });
-      showToast("Campaign deployment updated successfully.", "approved", 3800, "cloud_upload");
-      setResult((current) =>
-        current
-          ? {
-              ...current,
-              deployment: payload.deployment || current.deployment
-            }
-          : current
-      );
-      await refreshSavedCampaigns();
-    } catch (nextError) {
-      setError(nextError.message);
-      showToast(nextError.message, "error", 5600, "warning");
-    } finally {
-      setPreviewActionLoading(false);
-    }
-  }
-
   async function handleArtifactOpen(artifactKey) {
     if (!result?.campaignId) {
       return;
@@ -776,7 +738,6 @@ export default function App() {
               loading={loading}
               result={result}
               hasCampaign={hasCampaign}
-              deployment={deployment}
               reviewActionState={reviewActionState}
               onArtifactOpen={handleArtifactOpen}
               onSubmitOperatorInput={handleOperatorInput}
@@ -804,11 +765,8 @@ export default function App() {
               result={result}
               onExport={downloadResultJson}
               onExportKit={downloadCampaignKit}
-              onDeploy={handleDeployCampaign}
               hasCampaign={hasCampaign}
               approvedTabs={approvedTabs}
-              deployment={deployment}
-              actionLoading={previewActionLoading}
               error={error}
               onNotify={showToast}
             />

@@ -136,23 +136,12 @@ function buildTopicVisualDataUrl(seedSource, variant = "desktop") {
   return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
 }
 
-function formatDeployLabel(deployment) {
-  if (!deployment?.deployed) {
-    return "Waiting for Deployment";
-  }
-
-  return `Deployed - ${deployment.deployedChannels.length} channel${deployment.deployedChannels.length === 1 ? "" : "s"}`;
-}
-
 export default function PreviewView({
   result,
   onExport,
   onExportKit,
-  onDeploy,
   hasCampaign,
   approvedTabs,
-  deployment,
-  actionLoading,
   onNotify
 }) {
   const blog = result?.content?.blog || "";
@@ -165,8 +154,6 @@ export default function PreviewView({
   const omniImpact = hasCampaign ? `${Math.min(100, 48 + approvedCount * 14 + tweets.length * 3)}%` : "--";
   const loadPerformance = hasCampaign && result?.telemetry?.durationMs ? `${(result.telemetry.durationMs / 1000).toFixed(1)}s` : "--";
   const visualSync = hasCampaign ? `${approvedCount}/3 channels approved` : "No review data yet";
-  const deployLabel = formatDeployLabel(deployment);
-  const deploymentTime = deployment?.deployedAt ? new Date(deployment.deployedAt).toLocaleString() : "Not deployed";
   const previewVersion = result?.updatedAt || result?.telemetry?.requestCompletedAt || result?.requestId || "preview";
   const backendDesktopImageUrl =
     hasCampaign && result?.requestId
@@ -280,10 +267,11 @@ export default function PreviewView({
     <section className="preview-page">
       <div className="preview-page__hero">
         <div>
+          <div className="preview-page__eyebrow">Multi-channel Output Preview</div>
           <h2>
             Responsive <span>Preview</span>
           </h2>
-          <p>{hasCampaign ? "Campaign active - multi-channel validation ready" : "Start a campaign to preview desktop and mobile output"}</p>
+          <p>{hasCampaign ? "Multi-channel output preview for approved campaign assets" : "Preview not available until a campaign is generated and approved"}</p>
         </div>
 
         <div className="preview-page__hero-actions">
@@ -333,7 +321,7 @@ export default function PreviewView({
                   {hasCampaign && blogExcerpt ? (
                     <p>{blogExcerpt}</p>
                   ) : (
-                    <p>Generated blog content is rendered here once the campaign has been started and approved.</p>
+                    <p>Start and approve a campaign to render structured desktop and mobile outputs across channels.</p>
                   )}
                 </div>
               </article>
@@ -370,7 +358,7 @@ export default function PreviewView({
                       <span>Factory Architect</span>
                       <span className="material-symbols-outlined">verified</span>
                     </div>
-                    <p>{hasCampaign ? firstTweet || getEmailHeadline(email) : "Social preview becomes available after the first campaign run."}</p>
+                    <p>{hasCampaign ? firstTweet || getEmailHeadline(email) : "Start and approve a campaign to populate the mobile preview with social-ready output."}</p>
                   </div>
                 </div>
 
@@ -425,22 +413,12 @@ export default function PreviewView({
 
         <div className="preview-stat">
           <div className="preview-stat__label">
-            <span className="material-symbols-outlined">cloud_upload</span>
-            <span>Deployment</span>
+            <span className="material-symbols-outlined">view_carousel</span>
+            <span>Preview Coverage</span>
           </div>
-          <div className="preview-stat__status">
-            <span></span>
-            <strong>{deployLabel}</strong>
-          </div>
-          <p>{deploymentTime}</p>
+          <strong>{hasCampaign ? "Desktop + Mobile" : "Unavailable"}</strong>
+          <p>{hasCampaign ? "The preview renders blog and social surfaces from the current approved campaign state." : "Start and approve a campaign to unlock multi-surface preview output."}</p>
         </div>
-      </div>
-
-      <div className="preview-fab">
-        <button type="button" onClick={onDeploy} disabled={!hasCampaign || actionLoading}>
-          <span>{actionLoading ? "Deploying..." : "Deploy All Channels"}</span>
-          <span className="material-symbols-outlined">send</span>
-        </button>
       </div>
     </section>
   );
