@@ -96,8 +96,6 @@ function buildTopicVisualDataUrl(seedSource, variant = "desktop") {
   const offsetA = 180 + ((seed >> 2) % 120);
   const offsetB = 380 + ((seed >> 4) % 140);
   const hueShift = seed % 25;
-  const label = variant === "mobile" ? "SOCIAL VISUAL" : "FEATURE TECH";
-
   const svg = `
     <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
       <defs>
@@ -128,8 +126,6 @@ function buildTopicVisualDataUrl(seedSource, variant = "desktop") {
         <path d="M 60 ${Math.round(height * 0.2)} L ${width - 60} ${Math.round(height * 0.2)}"/>
         <path d="M 60 ${Math.round(height * 0.8)} L ${width - 60} ${Math.round(height * 0.8)}"/>
       </g>
-      <rect x="44" y="44" width="170" height="42" rx="11" fill="#4f46e5"/>
-      <text x="69" y="71" fill="#ffffff" font-family="Inter, Arial, sans-serif" font-size="20" font-weight="700">${label}</text>
     </svg>
   `;
 

@@ -379,41 +379,40 @@ function wrapSvgText(value, maxLength = 30) {
 }
 
 function buildFallbackSvg(title, variant = "desktop") {
-  const titleLines = wrapSvgText(title, variant === "mobile" ? 22 : 30).map(escapeSvgText);
-  const safeVariant = escapeSvgText(variant === "mobile" ? "SOCIAL VISUAL" : "BLOG HERO");
-  const subtitle = escapeSvgText("Topic-aware branded fallback rendered locally.");
-  const titleY = variant === "mobile" ? 350 : 320;
-  const titleSize = variant === "mobile" ? 58 : 64;
+  const titleLines = wrapSvgText(title, variant === "mobile" ? 24 : 34).map(escapeSvgText);
+  const width = variant === "mobile" ? 1080 : 1400;
+  const height = variant === "mobile" ? 1080 : 760;
+  const titleSize = variant === "mobile" ? 56 : 60;
+  const titleY = variant === "mobile" ? 410 : 330;
 
   return `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="900" viewBox="0 0 1400 900">
+<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0%" stop-color="#081121"/>
-      <stop offset="100%" stop-color="#0f1b34"/>
+      <stop offset="100%" stop-color="#0d172b"/>
     </linearGradient>
-    <radialGradient id="glow" cx="35%" cy="30%" r="40%">
-      <stop offset="0%" stop-color="#00f0ff" stop-opacity="0.6"/>
+    <radialGradient id="glow" cx="50%" cy="45%" r="45%">
+      <stop offset="0%" stop-color="#00f0ff" stop-opacity="0.42"/>
+      <stop offset="45%" stop-color="#00f0ff" stop-opacity="0.12"/>
       <stop offset="100%" stop-color="#00f0ff" stop-opacity="0"/>
     </radialGradient>
-    <linearGradient id="card" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#111a2e" stop-opacity="0.95"/>
-      <stop offset="100%" stop-color="#091120" stop-opacity="0.98"/>
-    </linearGradient>
   </defs>
-  <rect width="1400" height="900" fill="url(#bg)"/>
-  <rect x="72" y="72" width="1256" height="756" rx="28" fill="#ffffff" fill-opacity="0.02" stroke="#ffffff" stroke-opacity="0.08"/>
-  <circle cx="500" cy="310" r="240" fill="url(#glow)"/>
-  <rect x="160" y="178" width="240" height="44" rx="12" fill="#4f46e5"/>
-  <text x="190" y="206" fill="#ffffff" font-family="Arial, sans-serif" font-size="24" font-weight="700">${safeVariant}</text>
-  <g fill="#eff6ff" font-family="Arial, sans-serif" font-size="${titleSize}" font-weight="700">
-    ${titleLines.map((line, index) => `<text x="160" y="${titleY + index * 78}">${line}</text>`).join("")}
+  <rect width="${width}" height="${height}" rx="24" fill="url(#bg)"/>
+  <rect x="1" y="1" width="${width - 2}" height="${height - 2}" rx="24" fill="none" stroke="rgba(255,255,255,0.05)"/>
+  <ellipse cx="${Math.round(width * 0.48)}" cy="${Math.round(height * 0.44)}" rx="${Math.round(width * 0.18)}" ry="${Math.round(height * 0.25)}" fill="url(#glow)"/>
+  <g fill="none" stroke="#38e4ff" stroke-opacity="0.72" stroke-width="3">
+    <path d="M 40 ${Math.round(height * 0.34)} C ${Math.round(width * 0.18)} ${Math.round(height * 0.18)}, ${Math.round(width * 0.36)} ${Math.round(height * 0.5)}, ${Math.round(width * 0.52)} ${Math.round(height * 0.34)} S ${Math.round(width * 0.84)} ${Math.round(height * 0.18)}, ${width - 40} ${Math.round(height * 0.34)}" />
+    <path d="M 40 ${Math.round(height * 0.39)} C ${Math.round(width * 0.18)} ${Math.round(height * 0.24)}, ${Math.round(width * 0.36)} ${Math.round(height * 0.55)}, ${Math.round(width * 0.52)} ${Math.round(height * 0.39)} S ${Math.round(width * 0.84)} ${Math.round(height * 0.24)}, ${width - 40} ${Math.round(height * 0.39)}" opacity="0.75" />
+    <path d="M 40 ${Math.round(height * 0.62)} C ${Math.round(width * 0.2)} ${Math.round(height * 0.75)}, ${Math.round(width * 0.38)} ${Math.round(height * 0.48)}, ${Math.round(width * 0.56)} ${Math.round(height * 0.62)} S ${Math.round(width * 0.84)} ${Math.round(height * 0.75)}, ${width - 40} ${Math.round(height * 0.62)}" opacity="0.55" />
   </g>
-  <text x="160" y="${titleY + titleLines.length * 78 + 28}" fill="#94a3b8" font-family="Arial, sans-serif" font-size="32">${subtitle}</text>
-  <rect x="160" y="560" width="920" height="180" rx="24" fill="url(#card)" stroke="#ffffff" stroke-opacity="0.06"/>
-  <text x="210" y="626" fill="#94a3b8" font-family="Arial, sans-serif" font-size="24" font-weight="700">PREVIEW STATUS</text>
-  <text x="210" y="682" fill="#eff6ff" font-family="Arial, sans-serif" font-size="42" font-weight="700">AI image provider unavailable right now</text>
-  <text x="210" y="726" fill="#94a3b8" font-family="Arial, sans-serif" font-size="26">The app is still rendering a topic-driven fallback visual so the preview never appears broken.</text>
+  <g fill="none" stroke="#6366f1" stroke-opacity="0.24" stroke-width="1.5">
+    <path d="M 60 ${Math.round(height * 0.18)} L ${width - 60} ${Math.round(height * 0.18)}"/>
+    <path d="M 60 ${Math.round(height * 0.82)} L ${width - 60} ${Math.round(height * 0.82)}"/>
+  </g>
+  <g fill="#eff6ff" font-family="Inter, Arial, sans-serif" font-size="${titleSize}" font-weight="700">
+    ${titleLines.map((line, index) => `<text x="${variant === "mobile" ? 80 : 120}" y="${titleY + index * Math.round(titleSize * 1.2)}">${line}</text>`).join("")}
+  </g>
 </svg>`;
 }
 
@@ -483,11 +482,24 @@ function getPreviewAsset(payload, variant) {
   const asset = payload?.previewAssets?.[variant];
   const signature = buildPreviewSignature(payload, variant);
 
-  if (asset?.data && asset?.signature === signature) {
+  if (asset?.data && asset?.signature === signature && !isLegacyFallbackAsset(asset)) {
     return asset;
   }
 
   return null;
+}
+
+function isLegacyFallbackAsset(asset) {
+  if (!asset || asset.status !== "fallback" || !asset.data || !String(asset.contentType || "").includes("svg")) {
+    return false;
+  }
+
+  try {
+    const svg = Buffer.from(asset.data, "base64").toString("utf8");
+    return svg.includes("AI image provider unavailable") || svg.includes("AI VISUAL") || svg.includes("SOCIAL VISUAL");
+  } catch {
+    return false;
+  }
 }
 
 function shouldRetryPreviewAsset(asset) {

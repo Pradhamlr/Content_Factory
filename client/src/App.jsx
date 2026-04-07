@@ -27,6 +27,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [toast, setToast] = useState(null);
+  const [searchQuery, setSearchQuery] = useState("");
   const [requestId, setRequestId] = useState("");
   const [liveLogs, setLiveLogs] = useState([]);
   const [agentStages, setAgentStages] = useState(initialAgentStages);
@@ -202,6 +203,60 @@ export default function App() {
     } finally {
       setCampaignsLoading(false);
     }
+  }
+
+  function handleTopbarSearch(query) {
+    const normalized = String(query || "").trim().toLowerCase();
+
+    if (!normalized) {
+      return;
+    }
+
+    const routeMatches = [
+      { keys: ["campaign", "upload", "pdf", "url", "source", "new"], view: "campaigns", label: "Campaign Assembly" },
+      { keys: ["agent", "war", "stream", "logic", "telemetry", "gatekeeper", "brain", "voice"], view: "agents", label: "Agent Room" },
+      { keys: ["content", "library", "review", "blog", "social", "email", "approval"], view: "analysis", label: "Content Library" },
+      { keys: ["preview", "mobile", "desktop", "responsive", "visual"], view: "preview", label: "Preview" }
+    ];
+    const routeMatch = routeMatches.find((route) => route.keys.some((key) => normalized.includes(key)));
+
+    if (routeMatch) {
+      setActiveView(routeMatch.view);
+      showToast(`Opened ${routeMatch.label}.`, "info", 2600, "search");
+      return;
+    }
+
+    const campaignMatch = savedCampaigns.find((campaign) => {
+      const haystack = `${campaign.previewTitle || ""} ${campaign.source?.type || ""} ${campaign.status || ""} ${campaign.reviewStatus || ""}`.toLowerCase();
+      return haystack.includes(normalized);
+    });
+
+    if (campaignMatch) {
+      handleLoadCampaign(campaignMatch.campaignId);
+      showToast("Matching campaign opened.", "approved", 2800, "folder_open");
+      return;
+    }
+
+    showToast("No matching system section or saved campaign found.", "warning", 3200, "search_off");
+  }
+
+  function handleTelemetryClick() {
+    setActiveView("agents");
+    showToast("Live telemetry is available in the Agent Room.", "info", 3000, "sensors");
+  }
+
+  function handleNotificationsClick() {
+    if (loading) {
+      showToast("Campaign generation is currently in progress.", "info", 3200, "notifications");
+      return;
+    }
+
+    if (result?.reviewStatus || result?.status) {
+      showToast(`Latest campaign status: ${result.reviewStatus || result.status}.`, result.status === "APPROVED" ? "approved" : "info", 3200, "notifications");
+      return;
+    }
+
+    showToast("No unread system notifications.", "info", 2800, "notifications");
   }
 
   async function handleGenerate() {
@@ -704,7 +759,16 @@ export default function App() {
       <AppSidebar activeView={activeView} onChange={setActiveView} />
 
       <div className="app-main">
-        <AppTopbar activeView={activeView} status={result?.reviewStatus || result?.status || (loading ? "PROCESSING" : "STANDBY")} requestId={requestId} />
+        <AppTopbar
+          activeView={activeView}
+          status={result?.reviewStatus || result?.status || (loading ? "PROCESSING" : "STANDBY")}
+          requestId={requestId}
+          searchQuery={searchQuery}
+          onSearchQueryChange={setSearchQuery}
+          onSearchSubmit={handleTopbarSearch}
+          onTelemetryClick={handleTelemetryClick}
+          onNotificationsClick={handleNotificationsClick}
+        />
 
         <main className="app-content">
           {activeView === "campaigns" ? (

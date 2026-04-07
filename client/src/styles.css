@@ -1550,6 +1550,7 @@ textarea:focus-visible {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  margin-bottom: 0.6rem;
 }
 
 .war-room-ambiguities__title {
@@ -1564,7 +1565,7 @@ textarea:focus-visible {
 }
 
 .war-room-ambiguities__list {
-  margin: 0.85rem 0 0;
+  margin: 0;
   padding-left: 1rem;
   color: #c9d8e8;
   display: grid;
@@ -3883,7 +3884,8 @@ textarea:focus-visible {
   }
 
   .war-room-page,
-  .campaign-metrics-grid {
+  .campaign-metrics-grid,
+  .review-layout {
     grid-template-columns: 1fr;
   }
 
@@ -3894,11 +3896,65 @@ textarea:focus-visible {
   .war-room-sidebar {
     width: auto;
   }
+
+  .campaign-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .preview-page__hero {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .preview-page__hero-actions {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .preview-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 860px) {
   .app-frame {
     flex-direction: column;
+  }
+
+  .app-sidebar {
+    height: auto;
+    box-shadow: none;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+
+  .app-sidebar__brand {
+    padding: 1rem 1rem 0.8rem;
+  }
+
+  .app-sidebar__nav {
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(9.5rem, 1fr);
+    overflow-x: auto;
+    padding: 0 1rem 0.5rem;
+    gap: 0.5rem;
+    scrollbar-width: none;
+  }
+
+  .app-sidebar__nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .app-sidebar__nav-item {
+    min-height: 3.25rem;
+  }
+
+  .app-sidebar__footer {
+    padding: 1rem;
+  }
+
+  .app-sidebar__profile {
+    margin-top: 1rem;
+    padding-top: 1rem;
   }
 
   .app-topbar {
@@ -3911,10 +3967,20 @@ textarea:focus-visible {
   .app-topbar__utility {
     flex-direction: column;
     align-items: flex-start;
+    width: 100%;
   }
 
   .app-topbar__search {
     width: 100%;
+  }
+
+  .app-topbar__utility {
+    gap: 0.75rem;
+    margin-top: 0.85rem;
+  }
+
+  .app-topbar__divider {
+    display: none;
   }
 
   .app-content {
@@ -3924,6 +3990,25 @@ textarea:focus-visible {
   .campaign-table__row,
   .war-room-agents {
     grid-template-columns: 1fr;
+  }
+
+  .campaign-uploader__actions,
+  .review-content__footer-actions,
+  .review-content__footer-tools,
+  .review-content__tabs,
+  .review-history__header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .campaign-primary-button,
+  .campaign-secondary-button,
+  .review-content__secondary,
+  .review-content__primary,
+  .review-page__export,
+  .preview-page__secondary,
+  .preview-page__primary {
+    width: 100%;
   }
 
   .war-room-intelligence-grid {
@@ -3936,6 +4021,134 @@ textarea:focus-visible {
 
   .war-room-link {
     display: none;
+  }
+
+  .war-room-agents {
+    gap: 0.85rem;
+  }
+
+  .war-room-stream__head,
+  .war-room-operation__head,
+  .review-page__header,
+  .review-content__tabs {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .war-room-page,
+  .review-layout,
+  .preview-layout,
+  .preview-stats {
+    gap: 1rem;
+  }
+
+  .preview-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .preview-mobile {
+    max-width: 100%;
+  }
+
+  .review-content__tab-list {
+    width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .review-content__tab-list::-webkit-scrollbar {
+    display: none;
+  }
+
+  .review-content__tab {
+    flex: 0 0 auto;
+  }
+
+  .review-content__score {
+    align-self: flex-start;
+  }
+
+  .app-toast,
+  .review-toast {
+    top: 1rem;
+    right: 1rem;
+    left: 1rem;
+    width: auto;
+  }
+}
+
+@media (max-width: 640px) {
+  .app-content {
+    padding: 0.85rem;
+  }
+
+  .app-sidebar__title {
+    font-size: 1.15rem;
+  }
+
+  .campaign-hero__copy h2,
+  .preview-page__hero h2,
+  .war-room-summary h2 {
+    font-size: 1.35rem;
+  }
+
+  .campaign-uploader,
+  .campaign-history,
+  .review-source,
+  .review-content,
+  .war-room-panel,
+  .war-room-insight-card,
+  .war-room-ambiguities {
+    border-radius: 0.7rem;
+  }
+
+  .campaign-uploader,
+  .review-source__body,
+  .review-content__body,
+  .browser-preview__body {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  .campaign-uploader__chips {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .campaign-uploader__chip-button {
+    min-width: 8rem;
+    justify-content: center;
+  }
+
+  .browser-preview__body {
+    min-height: auto;
+    padding-top: 1.2rem;
+    padding-bottom: 1rem;
+  }
+
+  .browser-article h3 {
+    font-size: 1rem;
+  }
+
+  .browser-article__hero-image img {
+    height: 10rem;
+  }
+
+  .phone-preview {
+    border-width: 6px;
+    border-radius: 2rem;
+  }
+
+  .review-page__header {
+    gap: 0.75rem;
+  }
+
+  .review-history,
+  .review-content__body,
+  .review-content__tabs,
+  .review-content__footer {
+    margin-left: 0;
+    margin-right: 0;
   }
 }
 .review-content__approval-banner {
