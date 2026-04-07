@@ -17,25 +17,54 @@ function toHeadlineCase(value) {
     .replace(/^./, (character) => character.toUpperCase());
 }
 
-function buildBlogTitle(blog, facts = {}) {
+function cleanTitleCandidate(value) {
+  return String(value || "")
+    .replace(/^#+\s*/gm, "")
+    .replace(/\*\*/g, "")
+    .replace(/^title:\s*/i, "")
+    .replace(/^(blog post|campaign story|draft title)\s*[:\-]\s*/i, "")
+    .replace(/[.!?]+$/, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function buildBlogTitle(blog, facts = {}, explicitTitle = "") {
+  const providedTitle = cleanTitleCandidate(explicitTitle);
+
+  if (providedTitle.length >= 12 && providedTitle.length <= 92) {
+    return toHeadlineCase(providedTitle);
+  }
+
   const valueProp = String(facts?.valueProposition || "").replace(/[.!?]+$/, "").trim();
 
-  if (valueProp.length >= 18 && valueProp.length <= 88) {
+  if (valueProp.length >= 24 && valueProp.length <= 92 && !/^imagine\b/i.test(valueProp)) {
     return toHeadlineCase(valueProp);
   }
 
   const clean = String(blog || "").replace(/^#+\s*/gm, "").replace(/\*\*/g, "").trim();
   const lines = clean.split("\n").map((line) => line.trim()).filter(Boolean);
-  const headingLike = lines.find((line) => line.length >= 18 && line.length <= 88 && !/[,:;].{25,}/.test(line));
+  const headingLike = lines
+    .map(cleanTitleCandidate)
+    .find((line) =>
+      line.length >= 22 &&
+      line.length <= 92 &&
+      !/^imagine\b/i.test(line) &&
+      !/[,:;].{25,}/.test(line) &&
+      line.split(/\s+/).length <= 12
+    );
 
   if (headingLike) {
-    return headingLike.replace(/[.!?]+$/, "");
+    return toHeadlineCase(headingLike);
   }
 
   const firstSentence = clean.match(/[^.!?]+[.!?]/)?.[0]?.trim().replace(/[.!?]+$/, "") || "";
 
   if (firstSentence) {
-    const shortened = firstSentence.split(/\s+/).slice(0, 12).join(" ");
+    const shortened = cleanTitleCandidate(firstSentence)
+      .replace(/^large enterprises and mid-sized companies often struggle with\s+/i, "Solving ")
+      .split(/\s+/)
+      .slice(0, 10)
+      .join(" ");
     return toHeadlineCase(shortened);
   }
 
@@ -143,7 +172,7 @@ export default function PreviewView({
   const blog = result?.content?.blog || "";
   const tweets = Array.isArray(result?.content?.tweets) ? result.content.tweets : [];
   const email = result?.content?.email || "";
-  const blogTitle = buildBlogTitle(blog, result?.facts);
+  const blogTitle = buildBlogTitle(blog, result?.facts, result?.content?.blogTitle || "");
   const firstTweet = tweets[0] || "";
   const approvedCount = Object.values(approvedTabs || {}).filter(Boolean).length;
   const seoScore = hasCampaign ? result?.telemetry?.quality?.score ?? "--" : "--";

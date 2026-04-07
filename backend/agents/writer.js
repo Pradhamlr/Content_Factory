@@ -35,6 +35,7 @@ ${context.approvedBaselineExists ? "An approved baseline already exists for this
 
 Return structured JSON:
 {
+  "blogTitle": "...",
   "blog": "...",
   "tweets": ["...", "..."],
   "email": "..."

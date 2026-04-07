@@ -56,6 +56,7 @@ ANTI-GENERIC ENFORCEMENT:
 OUTPUT FORMAT:
 
 BLOG (400-500 words):
+- Provide a strong standalone "blogTitle" field
 - Start with a sharp, product-specific hook (problem or use case)
 - Explain how the product works using actual features
 - Show how different users benefit
@@ -72,13 +73,16 @@ EMAIL:
 - Format:
   Subject: ...
   Preview: ...
-- 2–3 short paragraphs
-- Clear use-case explanation
-- Direct CTA in plain text
+- 2-3 polished body paragraphs after the preview line
+- 120-180 words total
+- Sound like a professional company email, not a one-line ad
+- Explain the use case, value proposition, and why it matters
+- End with a natural CTA sentence in plain text
 - No placeholders or templated tone
 
 RETURN JSON:
 {
+  "blogTitle": "...",
   "blog": "...",
   "tweets": ["...", "..."],
   "email": "..."
@@ -159,6 +163,7 @@ APPROVED:
 {
   "status": "APPROVED",
   "content": {
+    "blogTitle": "approved blog title",
     "blog": "approved blog content",
     "tweets": ["approved post 1", "approved post 2", "approved post 3", "approved post 4", "approved post 5"],
     "email": "approved email teaser"

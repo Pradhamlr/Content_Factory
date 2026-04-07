@@ -1,6 +1,7 @@
 export function normalizeCampaignContent(content) {
   if (!content || typeof content !== "object") {
     return {
+      blogTitle: "",
       blog: "",
       tweets: [],
       email: ""
@@ -8,6 +9,14 @@ export function normalizeCampaignContent(content) {
   }
 
   return {
+    blogTitle:
+      typeof content.blogTitle === "string"
+        ? content.blogTitle.trim()
+        : typeof content.blog_title === "string"
+        ? content.blog_title.trim()
+        : typeof content.title === "string"
+        ? content.title.trim()
+        : "",
     blog: typeof content.blog === "string" ? content.blog.trim() : "",
     tweets: Array.isArray(content.tweets) ? content.tweets.filter((item) => typeof item === "string" && item.trim()) : [],
     email:
@@ -26,6 +35,7 @@ export function mergeCampaignContent(primaryContent, fallbackContent) {
   const fallback = normalizeCampaignContent(fallbackContent);
 
   return {
+    blogTitle: primary.blogTitle || fallback.blogTitle,
     blog: primary.blog || fallback.blog,
     tweets: primary.tweets.length ? primary.tweets : fallback.tweets,
     email: primary.email || fallback.email

@@ -2828,6 +2828,36 @@ textarea:focus-visible {
   line-height: 1.75;
 }
 
+.review-email-fields {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1.1rem;
+}
+
+.review-email-field {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.review-email-field span {
+  color: var(--text-muted);
+  font-size: var(--type-12);
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.review-email-field h1 {
+  margin: 0;
+}
+
+.review-email-field p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--type-16);
+  line-height: 1.75;
+}
+
 .review-format__prose {
   color: #b9cacb;
   font-size: 0.96rem;

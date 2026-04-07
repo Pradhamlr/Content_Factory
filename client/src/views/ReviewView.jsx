@@ -34,38 +34,101 @@ function toHeadlineCase(value) {
     .replace(/^./, (character) => character.toUpperCase());
 }
 
-function buildBlogTitle(blog = "", facts = {}) {
+function cleanTitleCandidate(value) {
+  return String(value || "")
+    .replace(/^#+\s*/gm, "")
+    .replace(/\*\*/g, "")
+    .replace(/^title:\s*/i, "")
+    .replace(/^(blog post|campaign story|draft title)\s*[:\-]\s*/i, "")
+    .replace(/[.!?]+$/, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function buildBlogTitle(blog = "", facts = {}, explicitTitle = "") {
+  const providedTitle = cleanTitleCandidate(explicitTitle);
+
+  if (providedTitle.length >= 12 && providedTitle.length <= 92) {
+    return toHeadlineCase(providedTitle);
+  }
+
   const valueProp = String(facts?.valueProposition || "").replace(/[.!?]+$/, "").trim();
 
-  if (valueProp.length >= 18 && valueProp.length <= 88) {
+  if (valueProp.length >= 24 && valueProp.length <= 92 && !/^imagine\b/i.test(valueProp)) {
     return toHeadlineCase(valueProp);
   }
 
   const clean = String(blog || "").replace(/^#+\s*/gm, "").replace(/\*\*/g, "").trim();
   const lines = clean.split("\n").map((line) => line.trim()).filter(Boolean);
-  const headingLike = lines.find((line) => line.length >= 18 && line.length <= 88 && !/[,:;].{25,}/.test(line));
+  const headingLike = lines
+    .map(cleanTitleCandidate)
+    .find((line) =>
+      line.length >= 22 &&
+      line.length <= 92 &&
+      !/^imagine\b/i.test(line) &&
+      !/[,:;].{25,}/.test(line) &&
+      line.split(/\s+/).length <= 12
+    );
 
   if (headingLike) {
-    return headingLike.replace(/[.!?]+$/, "");
+    return toHeadlineCase(headingLike);
   }
 
   const firstSentence = clean.match(/[^.!?]+[.!?]/)?.[0]?.trim().replace(/[.!?]+$/, "") || "";
 
   if (firstSentence) {
-    return toHeadlineCase(firstSentence.split(/\s+/).slice(0, 12).join(" "));
+    const compact = cleanTitleCandidate(firstSentence)
+      .replace(/^large enterprises and mid-sized companies often struggle with\s+/i, "Solving ")
+      .split(/\s+/)
+      .slice(0, 10)
+      .join(" ");
+    return toHeadlineCase(compact);
   }
 
   return "Campaign Story";
 }
 
-function getBlogParts(blog = "", facts = {}) {
+function normalizeEmailUrlSpacing(value) {
+  let normalized = String(value || "");
+
+  for (let index = 0; index < 3; index += 1) {
+    normalized = normalized
+      .replace(/(https?:\/\/[^\s]+\.)\s+([a-z]{2,})(?=[\s),.;!?]|$)/gi, "$1$2")
+      .replace(/(https?:\/\/[^\s]+)\s+([/?#][^\s]*)/gi, "$1$2");
+  }
+
+  return normalized;
+}
+
+function splitEmailParagraphs(value) {
+  const paragraphs = normalizeEmailUrlSpacing(value)
+    .split(/\n\s*\n/)
+    .map((paragraph) => paragraph.replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+
+  if (paragraphs.length > 1) {
+    return paragraphs;
+  }
+
+  const sentences =
+    paragraphs[0]?.match(/[^.!?]+[.!?]+|[^.!?]+$/g)?.map((item) => item.trim()).filter(Boolean) || [];
+
+  if (sentences.length >= 3) {
+    const midpoint = Math.ceil(sentences.length / 2);
+    return [sentences.slice(0, midpoint).join(" "), sentences.slice(midpoint).join(" ")].filter(Boolean);
+  }
+
+  return paragraphs;
+}
+
+function getBlogParts(blog = "", facts = {}, explicitTitle = "") {
   const paragraphs = blog.split(/\n\s*\n/).map((item) => item.trim()).filter(Boolean);
 
   if (!paragraphs.length) {
     return { title: "No blog title generated yet", intro: "", body: [] };
   }
 
-  const title = buildBlogTitle(blog, facts);
+  const title = buildBlogTitle(blog, facts, explicitTitle);
   const intro = paragraphs[0] || "";
   const bodyStartIndex = intro && paragraphs[1] ? 1 : 1;
   const body = paragraphs.slice(bodyStartIndex);
@@ -83,13 +146,15 @@ function getEmailParts(email = "") {
   const bodyLines = lines.filter((line) => line !== subjectLine);
 
   if (subjectLine) {
-    const previewLine = bodyLines[0] || "";
-    const body = bodyLines.slice(1);
+    const explicitPreviewLine = bodyLines.find((line) => /^preview:/i.test(line)) || "";
+    const previewLine = explicitPreviewLine.replace(/^preview:\s*/i, "") || bodyLines[0] || "";
+    const bodyLineStart = explicitPreviewLine ? bodyLines.filter((line) => line !== explicitPreviewLine) : bodyLines.slice(1);
+    const body = splitEmailParagraphs(bodyLineStart.join("\n"));
 
     return {
       subject: subjectLine.replace(/^subject:\s*/i, "") || "Campaign update",
       preview: previewLine,
-      body
+      body: body.length ? body : [previewLine].filter(Boolean)
     };
   }
 
@@ -111,22 +176,24 @@ function getEmailParts(email = "") {
   const compactSubject = firstClause.split(/\s+/).slice(0, 8).join(" ").replace(/[.!?]+$/, "").trim();
   const subject = compactSubject.length >= 12 ? compactSubject : "Campaign update";
   const preview = secondSentence || firstSentence;
-  const bodySource = sentences.slice(1).length ? sentences.slice(1) : sentences.slice(0, 3);
-  const body = bodySource.reduce((chunks, sentence, index) => {
-    if (index % 2 === 0) {
-      chunks.push(sentence);
-    } else {
-      chunks[chunks.length - 1] = `${chunks[chunks.length - 1]} ${sentence}`.trim();
-    }
-
-    return chunks;
-  }, []);
+  const bodySource = sentences.slice(1).length ? sentences.slice(1, 4) : sentences.slice(0, 3);
+  const body = splitEmailParagraphs(bodySource.join(" "));
 
   return {
     subject,
     preview,
     body
   };
+}
+
+function formatRevisionStatus(value) {
+  return String(value || "Pending")
+    .replace(/_/g, " ")
+    .toLowerCase()
+    .split(" ")
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
 }
 
 function EmptyReviewState() {
@@ -139,8 +206,8 @@ function EmptyReviewState() {
   );
 }
 
-function BlogReview({ blog, facts }) {
-  const { title, intro, body } = getBlogParts(blog, facts);
+function BlogReview({ blog, blogTitle, facts }) {
+  const { title, intro, body } = getBlogParts(blog, facts, blogTitle);
 
   if (!blog) {
     return <EmptyReviewState />;
@@ -222,14 +289,24 @@ function EmailReview({ email }) {
   }
 
   return (
-    <article className="review-format review-format--email">
-      <header className="review-format__header">
-        <div className="review-format__meta">
-          <span className="review-format__chip">Email Review</span>
-          <span className="review-format__eyebrow">Inbox Preview</span>
+      <article className="review-format review-format--email">
+        <header className="review-format__header">
+          <div className="review-format__meta">
+            <span className="review-format__chip">Email Review</span>
+            <span className="review-format__eyebrow">Inbox Preview</span>
+          </div>
+        <div className="review-email-fields">
+          <div className="review-email-field">
+            <span>Subject</span>
+            <h1>{subject}</h1>
+          </div>
+          {preview ? (
+            <div className="review-email-field">
+              <span>Preview</span>
+              <p>{preview}</p>
+            </div>
+          ) : null}
         </div>
-        <h1>{subject}</h1>
-        {preview ? <p className="review-format__lead">{preview}</p> : null}
       </header>
 
       <div className="review-email-card">
@@ -296,8 +373,8 @@ export default function ReviewView({
       return <EmailReview email={content.email || ""} />;
     }
 
-    return <BlogReview blog={content.blog || ""} facts={result?.facts || {}} />;
-  }, [activeTab, content.blog, content.email, content.tweets, hasCampaign, result?.facts]);
+    return <BlogReview blog={content.blog || ""} blogTitle={content.blogTitle || ""} facts={result?.facts || {}} />;
+  }, [activeTab, content.blog, content.blogTitle, content.email, content.tweets, hasCampaign, result?.facts]);
 
   return (
     <section className="review-page">
@@ -402,7 +479,7 @@ export default function ReviewView({
                   {activeRevisions.map((entry) => (
                     <article key={entry.id} className="review-history__item">
                       <div className="review-history__item-top">
-                        <strong>{entry.reviewStatus || "PENDING"}</strong>
+                        <strong>{formatRevisionStatus(entry.reviewStatus)}</strong>
                         <span>{entry.timestamp ? new Date(entry.timestamp).toLocaleString() : "Unknown time"}</span>
                       </div>
                       <div className="review-history__item-meta">
