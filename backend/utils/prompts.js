@@ -158,7 +158,11 @@ OUTPUT:
 APPROVED:
 {
   "status": "APPROVED",
-  "content": {...},
+  "content": {
+    "blog": "approved blog content",
+    "tweets": ["approved post 1", "approved post 2", "approved post 3", "approved post 4", "approved post 5"],
+    "email": "approved email teaser"
+  },
   "confidence": 0.0,
   "reason": "why content is acceptable based on available facts"
 }
