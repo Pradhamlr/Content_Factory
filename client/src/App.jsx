@@ -121,6 +121,16 @@ export default function App() {
     setPdfReviewDraft("");
   }
 
+  function getCampaignDisplayInput(payload, fallback = "") {
+    const source = payload?.source || {};
+
+    if (source.type === "url") {
+      return source.originalInput || payload?.sourceUrl || fallback;
+    }
+
+    return source.extractedText || payload?.extractedText || source.originalInput || fallback;
+  }
+
   function appendLog(message, type = "system", timestamp = new Date().toISOString()) {
     setLiveLogs((current) => [...current, { message, type, timestamp }]);
   }
@@ -301,7 +311,6 @@ export default function App() {
           method: "POST",
           body: JSON.stringify({ url: input.trim(), requestId: nextRequestId })
         });
-        setInput(payload.source?.extractedText || payload.extractedText || input.trim());
       } else {
         payload = await api("/api/generate", {
           method: "POST",
@@ -309,7 +318,7 @@ export default function App() {
         });
       }
 
-      applyCampaignState(payload, payload.source?.extractedText || payload.extractedText || input);
+      applyCampaignState(payload, getCampaignDisplayInput(payload, input.trim()));
       showToast(
         payload.status === "APPROVED"
           ? "Campaign generated and approved by the Gatekeeper."
@@ -396,7 +405,7 @@ export default function App() {
       setError("");
       eventSourceRef.current?.close();
       const payload = await api(`/api/campaigns/${campaignId}`);
-      const hydratedInput = payload?.source?.extractedText || payload?.source?.originalInput || "";
+      const hydratedInput = getCampaignDisplayInput(payload);
       applyCampaignState(payload, hydratedInput);
       setSourceMode(payload?.source?.type || "text");
       setAgentStages({

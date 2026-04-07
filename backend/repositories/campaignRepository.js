@@ -36,6 +36,7 @@ function normalizeCampaignRow(row) {
 function buildCampaignSummary(payload) {
   const blog = String(payload?.content?.blog || "").trim();
   const previewTitle =
+    String(payload?.content?.blogTitle || "").trim() ||
     String(payload?.facts?.valueProposition || "").trim() ||
     blog.split("\n").map((line) => line.trim()).find(Boolean) ||
     payload?.source?.label ||
