@@ -1,4 +1,4 @@
-import { groq, MODEL } from "../config/groq.js";
+import { createChatCompletion, MODELS } from "../config/ai.js";
 import { logAgentRun } from "../utils/agentLogger.js";
 import { EDITOR_SYSTEM_PROMPT } from "../utils/prompts.js";
 import { safeJsonParse } from "../utils/safeJson.js";
@@ -79,6 +79,8 @@ function parseEditorResult(rawText, submittedContent) {
 }
 
 export async function editorAgent(content, facts, context = {}) {
+  const model = MODELS.editor;
+
   if (context.requestId) {
     publish(context.requestId, "stage", {
       stage: "editor",
@@ -87,33 +89,44 @@ export async function editorAgent(content, facts, context = {}) {
     });
   }
 
-  const response = await groq.chat.completions.create({
-    model: MODEL,
-    temperature: 0.1,
-    messages: [
-      {
-        role: "system",
-        content: EDITOR_SYSTEM_PROMPT
-      },
-      {
-        role: "user",
-        content: JSON.stringify({
-          attempt: context.attempt || 1,
-          maxAttempts: context.maxAttempts || 1,
-          channel: context.channel || "",
-          targetedRegeneration: Boolean(context.targetedRegeneration),
-          approvedBaselineExists: Boolean(context.approvedBaselineExists),
-          approvedBaselineContent: context.approvedBaselineContent || null,
-          facts,
-          content,
-          previousFeedback: context.previousFeedback || "",
-          operatorGuidance: context.operatorGuidance || ""
-        })
-      }
-    ]
-  });
+  const response = await createChatCompletion(
+    {
+      model,
+      temperature: 0.1,
+      messages: [
+        {
+          role: "system",
+          content: EDITOR_SYSTEM_PROMPT
+        },
+        {
+          role: "user",
+          content: JSON.stringify({
+            attempt: context.attempt || 1,
+            maxAttempts: context.maxAttempts || 1,
+            channel: context.channel || "",
+            targetedRegeneration: Boolean(context.targetedRegeneration),
+            approvedBaselineExists: Boolean(context.approvedBaselineExists),
+            approvedBaselineContent: context.approvedBaselineContent || null,
+            facts,
+            content,
+            previousFeedback: context.previousFeedback || "",
+            operatorGuidance: context.operatorGuidance || ""
+          })
+        }
+      ]
+    },
+    {
+      agent: "editor",
+      requestId: context.requestId
+    }
+  );
 
   const result = parseEditorResult(response.choices?.[0]?.message?.content || "", content);
+  const meta = {
+    provider: response._provider || "unknown",
+    model: response._model || model,
+    fallbackUsed: Boolean(response._fallbackUsed)
+  };
 
   if (!result.status) {
     throw new Error("Editor agent returned an invalid response shape.");
@@ -165,7 +178,7 @@ export async function editorAgent(content, facts, context = {}) {
 
   await logAgentRun("editor", {
     requestId: context.requestId,
-    model: MODEL,
+    ...meta,
     facts,
     submittedContent: content,
     output: result
@@ -182,5 +195,8 @@ export async function editorAgent(content, facts, context = {}) {
     });
   }
 
-  return result;
+  return {
+    data: result,
+    meta
+  };
 }

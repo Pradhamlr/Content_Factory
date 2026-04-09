@@ -3,7 +3,7 @@ import express from "express";
 import cors from "cors";
 import path from "path";
 import { fileURLToPath } from "url";
-import { MODEL } from "./config/groq.js";
+import { FALLBACK_PROVIDER, MODELS, PRIMARY_PROVIDER } from "./config/ai.js";
 import { isDatabaseConfigured } from "./config/database.js";
 import { ensureCampaignSchema } from "./repositories/campaignRepository.js";
 import { toErrorResponse } from "./utils/errors.js";
@@ -85,7 +85,11 @@ async function startServer() {
 
   app.listen(PORT, () => {
     console.log(`Autonomous Content Factory backend running on port ${PORT}`);
-    console.log(`Groq model: ${MODEL}`);
+    console.log(`Primary AI provider: ${PRIMARY_PROVIDER}`);
+    console.log(`Fallback AI provider: ${FALLBACK_PROVIDER}`);
+    console.log(`Researcher model: ${MODELS.researcher}`);
+    console.log(`Writer model: ${MODELS.writer}`);
+    console.log(`Editor model: ${MODELS.editor}`);
     console.log(`Agent logs: ${logFilePath}`);
     console.log(`System logs: ${systemLogFilePath}`);
     if (allowedOrigins.length) {

@@ -269,6 +269,9 @@ export default function AgentsView({ liveLogs, agentStages, loading, result, has
     editingMs: telemetry?.stageTimings?.editorMs || 0,
     totalMs: telemetry?.durationMs || 0
   };
+  const aiTelemetry = telemetry?.ai || {};
+  const aiAgents = aiTelemetry?.agents || {};
+  const aiFallbackUsed = Boolean(aiTelemetry?.fallbackUsed);
 
   const intelligence = {
     features: telemetry?.featureCount || 0,
@@ -587,6 +590,16 @@ export default function AgentsView({ liveLogs, agentStages, loading, result, has
           <div className="war-room-panel__label-row">
             <span>Pipeline State</span>
             <strong>{formatStatusLabel(diagnostics.pipelineState)}</strong>
+          </div>
+          <div className="war-room-ai-status">
+            <div className={`war-room-ai-status__badge ${aiFallbackUsed ? "is-fallback" : "is-primary"}`}>
+              {aiFallbackUsed ? "Fallback Active" : "Primary Provider"}
+            </div>
+            <small>
+              {aiAgents?.researcher?.provider ? `Research: ${aiAgents.researcher.provider}` : "Research provider pending"}
+              {aiAgents?.writer?.provider ? ` • Write: ${aiAgents.writer.provider}` : ""}
+              {aiAgents?.editor?.provider ? ` • Edit: ${aiAgents.editor.provider}` : ""}
+            </small>
           </div>
           <div className="war-room-meter">
             <div className="war-room-meter__row">

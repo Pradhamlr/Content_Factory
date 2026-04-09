@@ -190,7 +190,8 @@ export default function App() {
 
     eventSource.addEventListener("agent-log", (event) => {
       const payload = JSON.parse(event.data);
-      appendLog(`${payload.agent}: output captured in telemetry log.`, payload.agent, payload.timestamp);
+      const fallbackNote = payload?.payload?.fallbackUsed ? " using fallback provider." : ".";
+      appendLog(`${payload.agent}: output captured in telemetry log${fallbackNote}`, payload.agent, payload.timestamp);
     });
 
     eventSource.addEventListener("complete", (event) => {

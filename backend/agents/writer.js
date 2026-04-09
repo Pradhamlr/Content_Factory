@@ -1,4 +1,4 @@
-import { groq, MODEL } from "../config/groq.js";
+import { createChatCompletion, MODELS } from "../config/ai.js";
 import { logAgentRun } from "../utils/agentLogger.js";
 import { WRITER_SYSTEM_PROMPT } from "../utils/prompts.js";
 import { safeJsonParse } from "../utils/safeJson.js";
@@ -6,6 +6,8 @@ import { publish } from "../utils/requestEvents.js";
 import { normalizeCampaignContent } from "../utils/contentShape.js";
 
 export async function writerAgent(facts, feedback = "", context = {}) {
+  const model = MODELS.writer;
+
   if (context.requestId) {
     publish(context.requestId, "stage", {
       stage: "writer",
@@ -14,17 +16,18 @@ export async function writerAgent(facts, feedback = "", context = {}) {
     });
   }
 
-  const response = await groq.chat.completions.create({
-    model: MODEL,
-    temperature: 0.5,
-    messages: [
-      {
-        role: "system",
-        content: WRITER_SYSTEM_PROMPT
-      },
-      {
-        role: "user",
-        content: `FACTS:
+  const response = await createChatCompletion(
+    {
+      model,
+      temperature: 0.5,
+      messages: [
+        {
+          role: "system",
+          content: WRITER_SYSTEM_PROMPT
+        },
+        {
+          role: "user",
+          content: `FACTS:
 ${JSON.stringify(facts, null, 2)}
 
 ${feedback ? `Fix based on this feedback: ${feedback}` : ""}
@@ -40,9 +43,14 @@ Return structured JSON:
   "tweets": ["...", "..."],
   "email": "..."
 }`
-      }
-    ]
-  });
+        }
+      ]
+    },
+    {
+      agent: "writer",
+      requestId: context.requestId
+    }
+  );
 
   const content = response.choices?.[0]?.message?.content || "";
   const rawParsed = safeJsonParse(content);
@@ -56,9 +64,15 @@ Return structured JSON:
         : rawParsed?.tweets
   });
 
+  const meta = {
+    provider: response._provider || "unknown",
+    model: response._model || model,
+    fallbackUsed: Boolean(response._fallbackUsed)
+  };
+
   await logAgentRun("writer", {
     requestId: context.requestId,
-    model: MODEL,
+    ...meta,
     feedback,
     facts,
     output: parsed
@@ -72,5 +86,8 @@ Return structured JSON:
     });
   }
 
-  return parsed;
+  return {
+    data: parsed,
+    meta
+  };
 }

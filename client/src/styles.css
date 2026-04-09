@@ -2115,6 +2115,43 @@ textarea:focus-visible {
   letter-spacing: 0.08em;
 }
 
+.war-room-ai-status {
+  margin-bottom: 0.9rem;
+  padding: 0.75rem 0.82rem;
+  border-radius: 0.75rem;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(255,255,255,0.05);
+}
+
+.war-room-ai-status__badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.28rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.war-room-ai-status__badge.is-primary {
+  background: rgba(0, 240, 255, 0.08);
+  color: var(--primary);
+}
+
+.war-room-ai-status__badge.is-fallback {
+  background: rgba(250, 204, 21, 0.1);
+  color: #fde68a;
+}
+
+.war-room-ai-status small {
+  display: block;
+  margin-top: 0.55rem;
+  color: rgba(210, 230, 255, 0.76);
+  font-size: var(--type-12);
+  line-height: 1.55;
+}
+
 .war-room-meter + .war-room-meter {
   margin-top: 1rem;
 }

@@ -21,9 +21,10 @@ import {
 } from "../utils/campaignState.js";
 import { requireNonEmptyString, requireObject, requireOneOf } from "../utils/validation.js";
 import { extractUrlText } from "../utils/urlExtractor.js";
+import { truncateModelInput } from "../utils/inputTruncation.js";
 
 const router = Router();
-const MAX_RETRIES = 2;
+const MAX_ATTEMPTS = 2;
 const STREAM_BOOT_DELAY_MS = 700;
 const STAGE_TRANSITION_DELAY_MS = 1600;
 const ATTEMPT_START_DELAY_MS = 900;
@@ -129,7 +130,7 @@ function clampQualityScore(value) {
   return Math.max(0, Math.min(99, Math.round(numeric)));
 }
 
-function buildQualityTelemetry(review, attempts = 1, maxAttempts = MAX_RETRIES + 1) {
+function buildQualityTelemetry(review, attempts = 1, maxAttempts = MAX_ATTEMPTS) {
   const confidence =
     typeof review?.confidence === "number"
       ? Math.max(0, Math.min(1, review.confidence))
@@ -146,6 +147,22 @@ function buildQualityTelemetry(review, attempts = 1, maxAttempts = MAX_RETRIES +
     source: "editor",
     reason: review?.reason || "",
     reviewStatus: review?.status || "PENDING"
+  };
+}
+
+function buildAiTelemetry(agentMeta = {}) {
+  const researcher = agentMeta.researcher || {};
+  const writer = agentMeta.writer || {};
+  const editor = agentMeta.editor || {};
+  const fallbackUsed = Boolean(researcher.fallbackUsed || writer.fallbackUsed || editor.fallbackUsed);
+
+  return {
+    fallbackUsed,
+    agents: {
+      researcher,
+      writer,
+      editor
+    }
   };
 }
 
@@ -587,9 +604,13 @@ function prewarmPreviewAssets(payload) {
 
 async function runCampaignPipeline(input, requestId, source = createSourceDescriptor({ type: "text", originalInput: input })) {
   const requestStartedAt = startTimer();
+  const preparedSource = truncateModelInput(input);
   logEvent("campaign_started", {
     requestId,
-    sourceType: source?.type || "text"
+    sourceType: source?.type || "text",
+    truncatedInput: preparedSource.truncated,
+    originalLength: preparedSource.originalLength,
+    finalLength: preparedSource.finalLength
   });
 
   publish(requestId, "lifecycle", {
@@ -597,16 +618,29 @@ async function runCampaignPipeline(input, requestId, source = createSourceDescri
     status: "started",
     message: "Campaign generation started."
   });
+  if (preparedSource.truncated) {
+    publish(requestId, "lifecycle", {
+      requestId,
+      status: "processing",
+      message: "Source content exceeded the safe model window and was compressed for reliable processing."
+    });
+  }
   await delay(STREAM_BOOT_DELAY_MS);
 
   const stageTimings = {
     researcherMs: 0,
     writerMs: 0,
-    editorMs: 0
+    editorMs: 0,
+    inputTruncated: preparedSource.truncated,
+    originalInputLength: preparedSource.originalLength,
+    finalInputLength: preparedSource.finalLength
   };
+  const agentMeta = {};
 
   const researcherStartedAt = startTimer();
-  const facts = await runWithRecovery("Researcher", requestId, () => researcherAgent(input.trim(), { requestId }));
+  const researchRun = await runWithRecovery("Researcher", requestId, () => researcherAgent(preparedSource.text, { requestId }));
+  const facts = researchRun.data;
+  agentMeta.researcher = researchRun.meta;
   stageTimings.researcherMs = endTimer(researcherStartedAt);
   await delay(STAGE_TRANSITION_DELAY_MS);
 
@@ -615,7 +649,7 @@ async function runCampaignPipeline(input, requestId, source = createSourceDescri
   let finalContent = null;
   let finalReview = null;
 
-  while (attempts <= MAX_RETRIES) {
+  while (attempts < MAX_ATTEMPTS) {
     attempts += 1;
     publish(requestId, "attempt", {
       requestId,
@@ -633,22 +667,26 @@ async function runCampaignPipeline(input, requestId, source = createSourceDescri
         message: "Operator guidance is being applied to the next draft cycle."
       });
     }
-    const draft = await runWithRecovery("Writer", requestId, () =>
+    const writerRun = await runWithRecovery("Writer", requestId, () =>
       writerAgent(facts, feedback, { requestId, operatorGuidance })
     );
+    const draft = writerRun.data;
+    agentMeta.writer = writerRun.meta;
     stageTimings.writerMs += endTimer(writerStartedAt);
     await delay(STAGE_TRANSITION_DELAY_MS);
 
     const editorStartedAt = startTimer();
-    const review = await runWithRecovery("Editor", requestId, () =>
+    const editorRun = await runWithRecovery("Editor", requestId, () =>
       editorAgent(draft, facts, {
         requestId,
         attempt: attempts,
-        maxAttempts: MAX_RETRIES + 1,
+        maxAttempts: MAX_ATTEMPTS,
         previousFeedback: feedback,
         operatorGuidance
       })
     );
+    const review = editorRun.data;
+    agentMeta.editor = editorRun.meta;
     stageTimings.editorMs += endTimer(editorStartedAt);
     await delay(STAGE_TRANSITION_DELAY_MS);
 
@@ -689,7 +727,8 @@ async function runCampaignPipeline(input, requestId, source = createSourceDescri
       ambiguityCount: Array.isArray(facts?.ambiguities) ? facts.ambiguities.length : 0,
       featureCount: Array.isArray(facts?.features) ? facts.features.length : 0,
       audienceCount: Array.isArray(facts?.targetAudience) ? facts.targetAudience.length : 0,
-      quality: buildQualityTelemetry(finalReview, attempts)
+      ai: buildAiTelemetry(agentMeta),
+      quality: buildQualityTelemetry(finalReview, attempts, MAX_ATTEMPTS)
     },
     revisionHistory: createEmptyRevisionHistory()
   });
@@ -1036,6 +1075,7 @@ router.post("/regenerate", async (req, res, next) => {
       let reviewedContent = null;
       let draft = null;
       let lastFeedback = priorRegenerationFeedback;
+      const agentMeta = {};
 
       publish(requestId, "attempt", {
         requestId,
@@ -1060,7 +1100,7 @@ router.post("/regenerate", async (req, res, next) => {
         await delay(ATTEMPT_START_DELAY_MS);
 
         const combinedFeedback = [baseFeedback, lastFeedback].filter(Boolean).join("\n\n");
-        draft = await runWithRecovery("Writer", requestId, () =>
+        const writerRun = await runWithRecovery("Writer", requestId, () =>
           writerAgent(facts, combinedFeedback, {
             requestId,
             operatorGuidance,
@@ -1069,8 +1109,10 @@ router.post("/regenerate", async (req, res, next) => {
             approvedBaselineExists: hadApprovedBaseline
           })
         );
+        draft = writerRun.data;
+        agentMeta.writer = writerRun.meta;
         await delay(REGENERATE_REVIEW_DELAY_MS);
-        review = await runWithRecovery("Editor", requestId, () =>
+        const editorRun = await runWithRecovery("Editor", requestId, () =>
           editorAgent(draft, facts, {
             requestId,
             attempt: regenerateAttempt,
@@ -1083,6 +1125,8 @@ router.post("/regenerate", async (req, res, next) => {
             approvedBaselineContent: currentChannelContent
           })
         );
+        review = editorRun.data;
+        agentMeta.editor = editorRun.meta;
 
         reviewedContent = review.status === "APPROVED" ? mergeCampaignContent(review.content, draft) : mergeCampaignContent(draft, {});
 
@@ -1145,6 +1189,10 @@ router.post("/regenerate", async (req, res, next) => {
           ? existing?.telemetry || {}
           : {
               ...(existing?.telemetry || {}),
+              ai: buildAiTelemetry({
+                researcher: existing?.telemetry?.ai?.agents?.researcher || null,
+                ...agentMeta
+              }),
               quality: buildQualityTelemetry(review, 1, 1)
             },
         revisionHistory: appendRevision(previousRevisionHistory, channel, {

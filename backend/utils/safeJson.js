@@ -108,20 +108,30 @@ function extractJsonObject(input) {
   return input.slice(start);
 }
 
+function normalizeJsonCandidate(input) {
+  return String(input || "")
+    .replace(/^\uFEFF/, "")
+    .replace(/[“”]/g, "\"")
+    .replace(/[‘’]/g, "'")
+    .replace(/,\s*([}\]])/g, "$1");
+}
+
 export function safeJsonParse(rawText) {
-  const cleaned = extractJsonObject(
-    rawText
-    .trim()
-    .replace(/^```json\s*/i, "")
-    .replace(/^```\s*/i, "")
-    .replace(/\s*```$/, "")
+  const cleaned = normalizeJsonCandidate(
+    extractJsonObject(
+      String(rawText || "")
+        .trim()
+        .replace(/^```json\s*/i, "")
+        .replace(/^```\s*/i, "")
+        .replace(/\s*```$/, "")
+    )
   );
 
   try {
     return JSON.parse(cleaned);
   } catch (error) {
     try {
-      const repaired = escapeControlCharactersInStrings(cleaned);
+      const repaired = normalizeJsonCandidate(escapeControlCharactersInStrings(cleaned));
       return JSON.parse(repaired);
     } catch (repairError) {
       const wrappedError = new Error(`Failed to parse model JSON response: ${cleaned}`);
