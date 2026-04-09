@@ -4,6 +4,7 @@ import { EDITOR_SYSTEM_PROMPT } from "../utils/prompts.js";
 import { safeJsonParse } from "../utils/safeJson.js";
 import { publish } from "../utils/requestEvents.js";
 import { normalizeCampaignContent } from "../utils/contentShape.js";
+import { buildPlatformInstructionBlock, getSocialPlatformLabel, normalizeSocialPlatform } from "../utils/platformRules.js";
 
 function factsContainExternalProofData(facts) {
   const serializedFacts = JSON.stringify(facts || {}).toLowerCase();
@@ -80,12 +81,15 @@ function parseEditorResult(rawText, submittedContent) {
 
 export async function editorAgent(content, facts, context = {}) {
   const model = MODELS.editor;
+  const socialPlatform = normalizeSocialPlatform(context.socialPlatform);
+  const socialLabel = getSocialPlatformLabel(socialPlatform);
+  const platformInstructions = buildPlatformInstructionBlock(socialPlatform);
 
   if (context.requestId) {
     publish(context.requestId, "stage", {
       stage: "editor",
       status: "running",
-      message: "The Gatekeeper is auditing the draft for specificity and fact use."
+      message: `The Gatekeeper is auditing the draft for specificity, fact use, and ${socialLabel} fit.`
     });
   }
 
@@ -104,6 +108,8 @@ export async function editorAgent(content, facts, context = {}) {
             attempt: context.attempt || 1,
             maxAttempts: context.maxAttempts || 1,
             channel: context.channel || "",
+            socialPlatform,
+            platformInstructions,
             targetedRegeneration: Boolean(context.targetedRegeneration),
             approvedBaselineExists: Boolean(context.approvedBaselineExists),
             approvedBaselineContent: context.approvedBaselineContent || null,
@@ -127,6 +133,21 @@ export async function editorAgent(content, facts, context = {}) {
     model: response._model || model,
     fallbackUsed: Boolean(response._fallbackUsed)
   };
+  const platformReview = result?.platformReview && typeof result.platformReview === "object"
+    ? {
+        platform: normalizeSocialPlatform(result.platformReview.platform || socialPlatform),
+        violations: Array.isArray(result.platformReview.violations) ? result.platformReview.violations.filter(Boolean) : [],
+        riskLevel: ["low", "medium", "high"].includes(String(result.platformReview.riskLevel || "").toLowerCase())
+          ? String(result.platformReview.riskLevel).toLowerCase()
+          : result.status === "APPROVED"
+          ? "low"
+          : "medium"
+      }
+    : {
+        platform: socialPlatform,
+        violations: [],
+        riskLevel: result.status === "APPROVED" ? "low" : "medium"
+      };
 
   if (!result.status) {
     throw new Error("Editor agent returned an invalid response shape.");
@@ -174,11 +195,13 @@ export async function editorAgent(content, facts, context = {}) {
     result.content = normalizeCampaignContent(result.content || content);
   }
 
+  result.platformReview = platformReview;
   result.confidence = normalizeConfidence(result.confidence, result.status === "APPROVED" ? 0.82 : 0.48);
 
   await logAgentRun("editor", {
     requestId: context.requestId,
     ...meta,
+    socialPlatform,
     facts,
     submittedContent: content,
     output: result

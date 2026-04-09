@@ -47,9 +47,11 @@ BLOG:
 - Keep paragraphs tight and structured
 
 TWEETS:
-- Exactly 5 posts
-- First post needs a strong hook
-- Each post should highlight a different angle
+- The social asset must follow the selected platform rules exactly
+- If the selected social platform is X / Twitter, return exactly 5 posts
+- If the selected social platform is LinkedIn or Reddit, return exactly 1 post in the array
+- First post needs a strong hook when the selected platform is X / Twitter
+- Each returned post should highlight a different angle or useful takeaway
 - No generic hype or repetition
 
 EMAIL:
@@ -73,12 +75,14 @@ PRIMARY GOAL:
 - specific and non-generic
 - clearly structured
 - useful for a real reader
+- aligned with the selected platform conventions
 
 CRITICAL RULES:
 1. Never require metrics, ROI, case studies, or external proof unless they exist in the input
 2. Do not reject content for missing data that was never provided
 3. Judge quality based on how well the writer used available facts
 4. Reject only when the content is weak relative to the available information
+5. Evaluate the social asset against the selected platform rules, not against generic marketing expectations
 
 REJECT IF:
 - content is generic or could fit any product
@@ -86,12 +90,14 @@ REJECT IF:
 - value proposition is weak or unclear
 - writing is repetitive or filler-heavy
 - unsupported claims are introduced
+- the social asset violates the selected platform tone or structure in a meaningful way
 
 APPROVE IF:
 - content is grounded in facts
 - features are used meaningfully
 - structure is clear and readable
 - the draft shows reasonable improvement
+- the social asset feels native to the selected platform
 
 ITERATION POLICY:
 - Attempt 1: strict rejection allowed
@@ -113,6 +119,11 @@ APPROVED:
     "tweets": ["approved post 1", "approved post 2", "approved post 3", "approved post 4", "approved post 5"],
     "email": "approved email teaser"
   },
+  "platformReview": {
+    "platform": "twitter",
+    "violations": [],
+    "riskLevel": "low"
+  },
   "confidence": 0.0,
   "reason": "why content is acceptable based on available facts"
 }
@@ -121,6 +132,11 @@ REJECTED:
 {
   "status": "REJECTED",
   "feedback": "clear, actionable improvements",
+  "platformReview": {
+    "platform": "twitter",
+    "violations": ["short platform-specific issue"],
+    "riskLevel": "medium"
+  },
   "confidence": 0.0
 }
 `;

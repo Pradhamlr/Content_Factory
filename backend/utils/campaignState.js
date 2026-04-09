@@ -1,12 +1,15 @@
 import crypto from "crypto";
 import { normalizeCampaignContent } from "./contentShape.js";
 
-export function createSourceDescriptor({ type = "text", label = "", originalInput = "", extractedText = "" } = {}) {
+export function createSourceDescriptor({ type = "text", label = "", originalInput = "", extractedText = "", socialPlatform = "twitter" } = {}) {
   return {
     type,
     label,
     originalInput,
-    extractedText: extractedText || originalInput
+    extractedText: extractedText || originalInput,
+    socialPlatform: ["twitter", "linkedin", "reddit"].includes(String(socialPlatform || "").toLowerCase())
+      ? String(socialPlatform).toLowerCase()
+      : "twitter"
   };
 }
 

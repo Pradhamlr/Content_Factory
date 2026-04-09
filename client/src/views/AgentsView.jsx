@@ -80,6 +80,16 @@ function getAmbiguities(result) {
     .filter(Boolean);
 }
 
+function normalizeSocialPlatform(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  return ["twitter", "linkedin", "reddit"].includes(normalized) ? normalized : "twitter";
+}
+
+function getSocialPlatformLabel(value) {
+  const normalized = normalizeSocialPlatform(value);
+  return normalized === "linkedin" ? "LinkedIn" : normalized === "reddit" ? "Reddit" : "X";
+}
+
 function buildArtifacts(result) {
   if (!result?.content) {
     return [];
@@ -172,6 +182,10 @@ function buildTasks(result) {
 
   if (result.telemetry?.ambiguityCount) {
     tasks.push(`${result.telemetry.ambiguityCount} ambiguity flag(s) need human review.`);
+  }
+
+  if (result?.source?.socialPlatform) {
+    tasks.push(`Social asset is being shaped for ${getSocialPlatformLabel(result.source.socialPlatform)}.`);
   }
 
   return tasks;
@@ -272,6 +286,8 @@ export default function AgentsView({ liveLogs, agentStages, loading, result, has
   const aiTelemetry = telemetry?.ai || {};
   const aiAgents = aiTelemetry?.agents || {};
   const aiFallbackUsed = Boolean(aiTelemetry?.fallbackUsed);
+  const socialPlatform = normalizeSocialPlatform(result?.source?.socialPlatform);
+  const platformReview = telemetry?.platformReview || {};
 
   const intelligence = {
     features: telemetry?.featureCount || 0,
@@ -296,7 +312,7 @@ export default function AgentsView({ liveLogs, agentStages, loading, result, has
   const editorStatus = agentStages.editor.status;
   const activeOperationLabel = reviewActionState?.channel
     ? reviewActionState.channel === "tweets"
-      ? "Social Thread"
+      ? `${getSocialPlatformLabel(result?.source?.socialPlatform)} Asset`
       : reviewActionState.channel === "email"
       ? "Email Teaser"
       : "Blog Post"
@@ -645,6 +661,17 @@ export default function AgentsView({ liveLogs, agentStages, loading, result, has
             <div className={`war-room-verdict ${verdict.className}`}>
               <strong>{verdict.label}</strong>
               <p>{verdict.detail}</p>
+              <div className="war-room-verdict__platform-meta">
+                <span>Platform Fit</span>
+                <strong>{getSocialPlatformLabel(socialPlatform)}</strong>
+              </div>
+              {Array.isArray(platformReview?.violations) && platformReview.violations.length ? (
+                <ul className="war-room-verdict__violations">
+                  {platformReview.violations.slice(0, 3).map((violation) => (
+                    <li key={violation}>{capitalizeFirstLetter(violation)}</li>
+                  ))}
+                </ul>
+              ) : null}
             </div>
           ) : (
             <EmptyPanel

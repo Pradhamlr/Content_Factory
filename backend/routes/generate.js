@@ -22,6 +22,7 @@ import {
 import { requireNonEmptyString, requireObject, requireOneOf } from "../utils/validation.js";
 import { extractUrlText } from "../utils/urlExtractor.js";
 import { truncateModelInput } from "../utils/inputTruncation.js";
+import { getSocialPlatformLabel, normalizeSocialPlatform } from "../utils/platformRules.js";
 
 const router = Router();
 const MAX_ATTEMPTS = 2;
@@ -146,7 +147,13 @@ function buildQualityTelemetry(review, attempts = 1, maxAttempts = MAX_ATTEMPTS)
     confidence: Number(confidence.toFixed(2)),
     source: "editor",
     reason: review?.reason || "",
-    reviewStatus: review?.status || "PENDING"
+    reviewStatus: review?.status || "PENDING",
+    platformFit: clampQualityScore(
+      typeof review?.platformReview?.violations?.length === "number"
+        ? 92 - review.platformReview.violations.length * 14
+        : confidence * 100
+    ),
+    riskLevel: review?.platformReview?.riskLevel || "low"
   };
 }
 
@@ -605,9 +612,12 @@ function prewarmPreviewAssets(payload) {
 async function runCampaignPipeline(input, requestId, source = createSourceDescriptor({ type: "text", originalInput: input })) {
   const requestStartedAt = startTimer();
   const preparedSource = truncateModelInput(input);
+  const socialPlatform = normalizeSocialPlatform(source?.socialPlatform);
+  const socialLabel = getSocialPlatformLabel(socialPlatform);
   logEvent("campaign_started", {
     requestId,
     sourceType: source?.type || "text",
+    socialPlatform,
     truncatedInput: preparedSource.truncated,
     originalLength: preparedSource.originalLength,
     finalLength: preparedSource.finalLength
@@ -668,7 +678,7 @@ async function runCampaignPipeline(input, requestId, source = createSourceDescri
       });
     }
     const writerRun = await runWithRecovery("Writer", requestId, () =>
-      writerAgent(facts, feedback, { requestId, operatorGuidance })
+      writerAgent(facts, feedback, { requestId, operatorGuidance, socialPlatform })
     );
     const draft = writerRun.data;
     agentMeta.writer = writerRun.meta;
@@ -682,7 +692,8 @@ async function runCampaignPipeline(input, requestId, source = createSourceDescri
         attempt: attempts,
         maxAttempts: MAX_ATTEMPTS,
         previousFeedback: feedback,
-        operatorGuidance
+        operatorGuidance,
+        socialPlatform
       })
     );
     const review = editorRun.data;
@@ -727,6 +738,13 @@ async function runCampaignPipeline(input, requestId, source = createSourceDescri
       ambiguityCount: Array.isArray(facts?.ambiguities) ? facts.ambiguities.length : 0,
       featureCount: Array.isArray(facts?.features) ? facts.features.length : 0,
       audienceCount: Array.isArray(facts?.targetAudience) ? facts.targetAudience.length : 0,
+      socialPlatform,
+      socialPlatformLabel: socialLabel,
+      platformReview: finalReview?.platformReview || {
+        platform: socialPlatform,
+        violations: [],
+        riskLevel: finalReview?.status === "APPROVED" ? "low" : "medium"
+      },
       ai: buildAiTelemetry(agentMeta),
       quality: buildQualityTelemetry(finalReview, attempts, MAX_ATTEMPTS)
     },
@@ -878,13 +896,15 @@ router.post("/", async (req, res, next) => {
             type: ["text", "pdf", "url"].includes(sourceOverride.type) ? sourceOverride.type : "text",
             label: typeof sourceOverride.label === "string" ? sourceOverride.label : "",
             originalInput: typeof sourceOverride.originalInput === "string" ? sourceOverride.originalInput : input,
-            extractedText: typeof sourceOverride.extractedText === "string" ? sourceOverride.extractedText : input
+            extractedText: typeof sourceOverride.extractedText === "string" ? sourceOverride.extractedText : input,
+            socialPlatform: normalizeSocialPlatform(sourceOverride.socialPlatform)
           })
         : createSourceDescriptor({
             type: "text",
             label: "Pasted source",
             originalInput: input,
-            extractedText: input
+            extractedText: input,
+            socialPlatform: normalizeSocialPlatform(req.body?.socialPlatform)
           });
 
     const payload = await withActionLock(`generate:${requestId}`, () =>
@@ -900,6 +920,7 @@ router.post("/upload", upload.single("file"), async (req, res, next) => {
   try {
     const requestId = req.body?.requestId || crypto.randomUUID();
     const file = req.file;
+    const socialPlatform = normalizeSocialPlatform(req.body?.socialPlatform);
 
     if (!file) {
       throw badRequest("Please upload a PDF file.");
@@ -938,7 +959,8 @@ router.post("/upload", upload.single("file"), async (req, res, next) => {
           type: "pdf",
           label: file.originalname,
           originalInput: file.originalname,
-          extractedText
+          extractedText,
+          socialPlatform
         })
       );
 
@@ -998,6 +1020,7 @@ router.post("/url", async (req, res, next) => {
   try {
     const url = requireNonEmptyString(req.body?.url, "url");
     const requestId = req.body?.requestId || crypto.randomUUID();
+    const socialPlatform = normalizeSocialPlatform(req.body?.socialPlatform);
 
     publish(requestId, "lifecycle", {
       requestId,
@@ -1021,7 +1044,8 @@ router.post("/url", async (req, res, next) => {
           type: "url",
           label: extracted.title,
           originalInput: extracted.finalUrl,
-          extractedText: extracted.extractedText
+          extractedText: extracted.extractedText,
+          socialPlatform
         })
       );
 
@@ -1054,13 +1078,14 @@ router.post("/regenerate", async (req, res, next) => {
     const previousDeployment = existing?.deployment || getDeployment(requestId);
     const previousRevisionHistory = existing?.revisionHistory || createEmptyRevisionHistory();
     const hadApprovedBaseline = existing?.status === "APPROVED" && existing?.content;
+    const socialPlatform = normalizeSocialPlatform(existing?.source?.socialPlatform);
     const currentChannelContent = getChannelContent(existing?.content || currentContent, channel);
     const latestRevision = Array.isArray(previousRevisionHistory?.[channel]) && previousRevisionHistory[channel].length
       ? previousRevisionHistory[channel][previousRevisionHistory[channel].length - 1]
       : null;
     const priorRegenerationFeedback = latestRevision?.feedback || existing?.feedback || "";
 
-    const channelLabel = channel === "tweets" ? "social thread" : channel === "email" ? "email teaser" : "blog post";
+    const channelLabel = channel === "tweets" ? `${getSocialPlatformLabel(socialPlatform).toLowerCase()}` : channel === "email" ? "email teaser" : "blog post";
     const baseFeedback =
       channel === "email"
         ? "Regenerate only the email teaser. Return a clear email-style asset with a concise subject line, a short preview line, and a brief body made of 2-3 compact paragraphs. Do not use all caps, placeholders like [Name], or generic filler."
@@ -1106,7 +1131,8 @@ router.post("/regenerate", async (req, res, next) => {
             operatorGuidance,
             channel: channelLabel,
             currentChannelContent,
-            approvedBaselineExists: hadApprovedBaseline
+            approvedBaselineExists: hadApprovedBaseline,
+            socialPlatform
           })
         );
         draft = writerRun.data;
@@ -1122,7 +1148,8 @@ router.post("/regenerate", async (req, res, next) => {
             channel: channelLabel,
             targetedRegeneration: true,
             approvedBaselineExists: hadApprovedBaseline,
-            approvedBaselineContent: currentChannelContent
+            approvedBaselineContent: currentChannelContent,
+            socialPlatform
           })
         );
         review = editorRun.data;
@@ -1193,6 +1220,13 @@ router.post("/regenerate", async (req, res, next) => {
                 researcher: existing?.telemetry?.ai?.agents?.researcher || null,
                 ...agentMeta
               }),
+              socialPlatform,
+              socialPlatformLabel: getSocialPlatformLabel(socialPlatform),
+              platformReview: review?.platformReview || existing?.telemetry?.platformReview || {
+                platform: socialPlatform,
+                violations: [],
+                riskLevel: review?.status === "APPROVED" ? "low" : "medium"
+              },
               quality: buildQualityTelemetry(review, 1, 1)
             },
         revisionHistory: appendRevision(previousRevisionHistory, channel, {

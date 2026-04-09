@@ -15,9 +15,20 @@ const initialAgentStages = {
   editor: { label: "The Gatekeeper", status: "idle" }
 };
 
+function normalizeSocialPlatform(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  return ["twitter", "linkedin", "reddit"].includes(normalized) ? normalized : "twitter";
+}
+
+function getSocialAssetLabel(value) {
+  const normalized = normalizeSocialPlatform(value);
+  return normalized === "linkedin" ? "LinkedIn Post" : normalized === "reddit" ? "Reddit Post" : "X Thread";
+}
+
 export default function App() {
   const [activeView, setActiveView] = useState("campaigns");
   const [sourceMode, setSourceMode] = useState("text");
+  const [socialPlatform, setSocialPlatform] = useState("twitter");
   const [input, setInput] = useState("");
   const [selectedFile, setSelectedFile] = useState(null);
   const [extractingPdf, setExtractingPdf] = useState(false);
@@ -95,6 +106,7 @@ export default function App() {
     setResult(payload);
     setRequestId(payload?.requestId || "");
     setInput(nextInput);
+    setSocialPlatform(normalizeSocialPlatform(payload?.source?.socialPlatform));
     setSelectedFile(null);
     setApprovedTabs(
       payload?.approvals || {
@@ -302,7 +314,8 @@ export default function App() {
               type: "pdf",
               label: selectedFile.name,
               originalInput: selectedFile.name,
-              extractedText: input.trim()
+              extractedText: input.trim(),
+              socialPlatform
             }
           })
         });
@@ -310,12 +323,22 @@ export default function App() {
       } else if (sourceMode === "url") {
         payload = await api("/api/generate/url", {
           method: "POST",
-          body: JSON.stringify({ url: input.trim(), requestId: nextRequestId })
+          body: JSON.stringify({ url: input.trim(), requestId: nextRequestId, socialPlatform })
         });
       } else {
         payload = await api("/api/generate", {
           method: "POST",
-          body: JSON.stringify({ input: input.trim(), requestId: nextRequestId })
+          body: JSON.stringify({
+            input: input.trim(),
+            requestId: nextRequestId,
+            source: {
+              type: "text",
+              label: "Pasted source",
+              originalInput: input.trim(),
+              extractedText: input.trim(),
+              socialPlatform
+            }
+          })
         });
       }
 
@@ -393,6 +416,7 @@ export default function App() {
 
   function handleLoadDemo() {
     setSourceMode("text");
+    setSocialPlatform("twitter");
     setInput(
       "PulseOS 4.2 helps marketing teams turn one source document into a coordinated launch package. It supports a research step that extracts factual claims, a writing step that creates a 400 to 500 word blog post, a five-part tweet thread, and a short email teaser, and an editing step that checks hallucinations, tone, and clarity before approval. The workflow is designed for product marketers, content strategists, and marketing operations teams that need faster content repurposing with less inconsistency."
     );
@@ -409,6 +433,7 @@ export default function App() {
       const hydratedInput = getCampaignDisplayInput(payload);
       applyCampaignState(payload, hydratedInput);
       setSourceMode(payload?.source?.type || "text");
+      setSocialPlatform(normalizeSocialPlatform(payload?.source?.socialPlatform));
       setAgentStages({
         researcher: { ...initialAgentStages.researcher, status: payload?.facts ? "complete" : "standby" },
         writer: { ...initialAgentStages.writer, status: payload?.content ? "complete" : "waiting" },
@@ -465,7 +490,7 @@ export default function App() {
       return;
     }
 
-    const channelLabel = channel === "tweets" ? "Social Thread" : channel === "email" ? "Email Teaser" : "Blog Post";
+    const channelLabel = channel === "tweets" ? getSocialAssetLabel(result?.source?.socialPlatform) : channel === "email" ? "Email Teaser" : "Blog Post";
     setReviewActionLoading(true);
     setError("");
     setActiveView("agents");
@@ -610,15 +635,15 @@ export default function App() {
         type: "approval",
         channel,
         status: "approved",
-        message: `${channel === "tweets" ? "Social Thread" : channel === "email" ? "Email Teaser" : "Blog Post"} approved and ready for final review and export.`
+        message: `${channel === "tweets" ? getSocialAssetLabel(result?.source?.socialPlatform) : channel === "email" ? "Email Teaser" : "Blog Post"} approved and ready for final review and export.`
       });
       showToast(
-        `${channel === "tweets" ? "Social Thread" : channel === "email" ? "Email Teaser" : "Blog Post"} approved.`,
+        `${channel === "tweets" ? getSocialAssetLabel(result?.source?.socialPlatform) : channel === "email" ? "Email Teaser" : "Blog Post"} approved.`,
         "approved",
         3600
       );
       appendLog(
-        `${channel === "tweets" ? "Social Thread" : channel === "email" ? "Email Teaser" : "Blog Post"} approval has been locked in for this campaign.`,
+        `${channel === "tweets" ? getSocialAssetLabel(result?.source?.socialPlatform) : channel === "email" ? "Email Teaser" : "Blog Post"} approval has been locked in for this campaign.`,
         "system"
       );
       setResult((current) =>
@@ -676,7 +701,7 @@ export default function App() {
           : current
       );
       appendLog(
-        `Manual override applied to ${channel === "tweets" ? "Social Thread" : channel === "email" ? "Email Teaser" : "Blog Post"}.`,
+        `Manual override applied to ${channel === "tweets" ? getSocialAssetLabel(result?.source?.socialPlatform) : channel === "email" ? "Email Teaser" : "Blog Post"}.`,
         "system"
       );
       showToast("Manual override saved.", "approved", 3600, "verified");
@@ -787,6 +812,8 @@ export default function App() {
               setInput={setInput}
               sourceMode={sourceMode}
               setSourceMode={setSourceMode}
+              socialPlatform={socialPlatform}
+              setSocialPlatform={setSocialPlatform}
               selectedFile={selectedFile}
               setSelectedFile={handlePdfSelect}
               onClearSelectedFile={handleClearSelectedFile}
@@ -824,6 +851,7 @@ export default function App() {
               result={result}
               onExport={downloadResultJson}
               hasCampaign={hasCampaign}
+              socialPlatform={socialPlatform}
               approvedTabs={approvedTabs}
               approvalMeta={approvalMeta}
               onApproveChannel={handleApproveChannel}
@@ -840,6 +868,7 @@ export default function App() {
               onExport={downloadResultJson}
               onExportKit={downloadCampaignKit}
               hasCampaign={hasCampaign}
+              socialPlatform={socialPlatform}
               approvedTabs={approvedTabs}
               error={error}
               onNotify={showToast}

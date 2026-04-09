@@ -1,6 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { buildApiUrl } from "../lib/api";
 
+function normalizeSocialPlatform(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  return ["twitter", "linkedin", "reddit"].includes(normalized) ? normalized : "twitter";
+}
+
+function getSocialPlatformLabel(value) {
+  const normalized = normalizeSocialPlatform(value);
+  return normalized === "linkedin" ? "LinkedIn Post" : normalized === "reddit" ? "Reddit Post" : "X Thread";
+}
+
 function toHeadlineCase(value) {
   return String(value || "")
     .toLowerCase()
@@ -166,9 +176,12 @@ export default function PreviewView({
   onExport,
   onExportKit,
   hasCampaign,
+  socialPlatform,
   approvedTabs,
   onNotify
 }) {
+  const selectedSocialPlatform = normalizeSocialPlatform(result?.source?.socialPlatform || socialPlatform);
+  const socialLabel = getSocialPlatformLabel(selectedSocialPlatform);
   const blog = result?.content?.blog || "";
   const tweets = Array.isArray(result?.content?.tweets) ? result.content.tweets : [];
   const email = result?.content?.email || "";
@@ -358,7 +371,7 @@ export default function PreviewView({
           <div className="preview-section-head">
             <div className="preview-section-head__label">
               <span className="material-symbols-outlined">smartphone</span>
-              <span>Social Thread</span>
+              <span>{socialLabel}</span>
             </div>
             <div className="preview-section-head__mobile-tag">Mobile</div>
           </div>
@@ -383,7 +396,7 @@ export default function PreviewView({
                       <span>Factory Architect</span>
                       <span className="material-symbols-outlined">verified</span>
                     </div>
-                    <p>{hasCampaign ? firstTweet || getEmailHeadline(email) : "Start and approve a campaign to populate the mobile preview with social-ready output."}</p>
+                    <p>{hasCampaign ? firstTweet || getEmailHeadline(email) : `Start and approve a campaign to populate the mobile preview with ${socialLabel.toLowerCase()} output.`}</p>
                   </div>
                 </div>
 
@@ -433,7 +446,7 @@ export default function PreviewView({
             <span>Approval State</span>
           </div>
           <strong>{visualSync}</strong>
-          <p>{hasCampaign ? `Blog ${approvedTabs?.blog ? "approved" : "pending"}, social ${approvedTabs?.tweets ? "approved" : "pending"}, email ${approvedTabs?.email ? "approved" : "pending"}` : "No approval data yet"}</p>
+          <p>{hasCampaign ? `Blog ${approvedTabs?.blog ? "approved" : "pending"}, ${socialLabel.toLowerCase()} ${approvedTabs?.tweets ? "approved" : "pending"}, email ${approvedTabs?.email ? "approved" : "pending"}` : "No approval data yet"}</p>
         </div>
 
         <div className="preview-stat">

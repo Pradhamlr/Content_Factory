@@ -18,6 +18,25 @@ const tabConfig = [
   }
 ];
 
+function normalizeSocialPlatform(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  return ["twitter", "linkedin", "reddit"].includes(normalized) ? normalized : "twitter";
+}
+
+function getSocialPlatformLabel(value) {
+  const normalized = normalizeSocialPlatform(value);
+
+  if (normalized === "linkedin") {
+    return "LinkedIn Post";
+  }
+
+  if (normalized === "reddit") {
+    return "Reddit Post";
+  }
+
+  return "X Thread";
+}
+
 function toHeadlineCase(value) {
   return String(value || "")
     .toLowerCase()
@@ -238,7 +257,16 @@ function BlogReview({ blog, blogTitle, facts }) {
   );
 }
 
-function SocialReview({ tweets }) {
+function SocialReview({ tweets, socialPlatform }) {
+  const socialLabel = getSocialPlatformLabel(socialPlatform);
+  const eyebrow = socialPlatform === "linkedin" ? "Professional Post" : socialPlatform === "reddit" ? "Discussion Post" : `${tweets.length} Posts`;
+  const lead =
+    socialPlatform === "linkedin"
+      ? "Review the post for clarity, credibility, and platform-native pacing before approval."
+      : socialPlatform === "reddit"
+      ? "Review the post for value-first tone, discussion fit, and low-promotion phrasing."
+      : "Review each post as an individual social unit while keeping the full thread progression readable.";
+
   if (!tweets?.length) {
     return <EmptyReviewState />;
   }
@@ -247,11 +275,11 @@ function SocialReview({ tweets }) {
     <section className="review-format review-format--social">
       <header className="review-format__header">
         <div className="review-format__meta">
-          <span className="review-format__chip">Thread Review</span>
-          <span className="review-format__eyebrow">{tweets.length} Posts</span>
+          <span className="review-format__chip">{socialPlatform === "twitter" ? "Thread Review" : "Platform Review"}</span>
+          <span className="review-format__eyebrow">{eyebrow}</span>
         </div>
-        <h1>Social Thread Narrative Pack</h1>
-        <p className="review-format__lead">Review each post as an individual social unit while keeping the full thread progression readable.</p>
+        <h1>{socialLabel} Narrative Pack</h1>
+        <p className="review-format__lead">{lead}</p>
       </header>
 
       <div className="review-social-list">
@@ -265,7 +293,9 @@ function SocialReview({ tweets }) {
                   <span>@contentfactory</span>
                 </div>
               </div>
-              <div className="review-social-card__count">{index + 1}/{tweets.length}</div>
+              <div className="review-social-card__count">
+                {socialPlatform === "twitter" ? `${index + 1}/${tweets.length}` : socialPlatform === "linkedin" ? "LinkedIn" : "Reddit"}
+              </div>
             </div>
             <p>{tweet}</p>
             <div className="review-social-card__actions">
@@ -337,6 +367,7 @@ export default function ReviewView({
   result,
   onExport,
   hasCampaign,
+  socialPlatform,
   approvedTabs,
   approvalMeta,
   onApproveChannel,
@@ -349,13 +380,29 @@ export default function ReviewView({
   const [historyOpen, setHistoryOpen] = useState(false);
   const [overrideOpen, setOverrideOpen] = useState(false);
   const [overrideNote, setOverrideNote] = useState("");
+  const selectedSocialPlatform = normalizeSocialPlatform(result?.source?.socialPlatform || socialPlatform);
+  const socialLabel = getSocialPlatformLabel(selectedSocialPlatform);
+  const reviewTabs = tabConfig.map((tab) =>
+    tab.key === "tweets"
+      ? {
+          ...tab,
+          label: socialLabel,
+          summary:
+            selectedSocialPlatform === "linkedin"
+              ? "Single-post review for structure, credibility, and native LinkedIn tone."
+              : selectedSocialPlatform === "reddit"
+              ? "Discussion-style review focused on value-first tone and low promotion risk."
+              : "Thread-by-thread review for clarity, punch, and narrative pacing."
+        }
+      : tab
+  );
 
   const sourceText = hasCampaign ? input?.trim() || "" : "";
   const content = result?.content || {};
   const reviewStatus = result?.reviewStatus || result?.status;
   const isRejected = reviewStatus === "REJECTED";
   const qualityScore = !hasCampaign ? "--" : result?.telemetry?.quality?.score ?? "--";
-  const activeMeta = tabConfig.find((tab) => tab.key === activeTab) || tabConfig[0];
+  const activeMeta = reviewTabs.find((tab) => tab.key === activeTab) || reviewTabs[0];
   const isApproved = Boolean(approvedTabs?.[activeTab]);
   const activeApprovalMeta = approvalMeta?.[activeTab] || { approved: false, type: null, note: "", approvedAt: null };
   const activeRevisions = Array.isArray(result?.revisionHistory?.[activeTab]) ? [...result.revisionHistory[activeTab]].reverse() : [];
@@ -366,7 +413,7 @@ export default function ReviewView({
     }
 
     if (activeTab === "tweets") {
-      return <SocialReview tweets={Array.isArray(content.tweets) ? content.tweets : []} />;
+      return <SocialReview tweets={Array.isArray(content.tweets) ? content.tweets : []} socialPlatform={selectedSocialPlatform} />;
     }
 
     if (activeTab === "email") {
@@ -374,7 +421,7 @@ export default function ReviewView({
     }
 
     return <BlogReview blog={content.blog || ""} blogTitle={content.blogTitle || ""} facts={result?.facts || {}} />;
-  }, [activeTab, content.blog, content.blogTitle, content.email, content.tweets, hasCampaign, result?.facts]);
+  }, [activeTab, content.blog, content.blogTitle, content.email, content.tweets, hasCampaign, result?.facts, selectedSocialPlatform]);
 
   return (
     <section className="review-page">
@@ -440,7 +487,7 @@ export default function ReviewView({
           <div className="review-content__tabs">
             <div className="review-content__tab-group">
               <div className="review-content__tab-list">
-                {tabConfig.map((tab) => (
+                {reviewTabs.map((tab) => (
                   <button
                     key={tab.key}
                     type="button"
