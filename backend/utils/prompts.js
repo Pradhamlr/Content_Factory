@@ -124,6 +124,11 @@ APPROVED:
     "violations": [],
     "riskLevel": "low"
   },
+  "channelReviews": {
+    "blog": { "status": "pass", "violations": [], "riskLevel": "low" },
+    "social": { "status": "pass", "violations": [], "riskLevel": "low" },
+    "email": { "status": "pass", "violations": [], "riskLevel": "low" }
+  },
   "confidence": 0.0,
   "reason": "why content is acceptable based on available facts"
 }
@@ -136,6 +141,11 @@ REJECTED:
     "platform": "twitter",
     "violations": ["short platform-specific issue"],
     "riskLevel": "medium"
+  },
+  "channelReviews": {
+    "blog": { "status": "pass", "violations": [], "riskLevel": "low" },
+    "social": { "status": "needs_work", "violations": ["platform issue"], "riskLevel": "medium" },
+    "email": { "status": "pass", "violations": [], "riskLevel": "low" }
   },
   "confidence": 0.0
 }

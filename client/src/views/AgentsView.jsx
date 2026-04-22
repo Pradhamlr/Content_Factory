@@ -663,7 +663,7 @@ export default function AgentsView({ liveLogs, agentStages, loading, result, has
               <p>{verdict.detail}</p>
               <div className="war-room-verdict__platform-meta">
                 <span>Platform Fit</span>
-                <strong>{getSocialPlatformLabel(socialPlatform)}</strong>
+                <strong>{getSocialPlatformLabel(socialPlatform)} • {String(platformReview?.riskLevel || "low").toUpperCase()} risk</strong>
               </div>
               {Array.isArray(platformReview?.violations) && platformReview.violations.length ? (
                 <ul className="war-room-verdict__violations">

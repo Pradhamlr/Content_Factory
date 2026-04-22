@@ -5,6 +5,7 @@ import { safeJsonParse } from "../utils/safeJson.js";
 import { publish } from "../utils/requestEvents.js";
 import { normalizeCampaignContent } from "../utils/contentShape.js";
 import { buildPlatformInstructionBlock, getSocialPlatformLabel, normalizeSocialPlatform } from "../utils/platformRules.js";
+import { buildChannelReviewFeedback, hasBlockingChannelIssues, normalizeEditorReviews } from "../utils/platformValidation.js";
 
 function factsContainExternalProofData(facts) {
   const serializedFacts = JSON.stringify(facts || {}).toLowerCase();
@@ -133,21 +134,9 @@ export async function editorAgent(content, facts, context = {}) {
     model: response._model || model,
     fallbackUsed: Boolean(response._fallbackUsed)
   };
-  const platformReview = result?.platformReview && typeof result.platformReview === "object"
-    ? {
-        platform: normalizeSocialPlatform(result.platformReview.platform || socialPlatform),
-        violations: Array.isArray(result.platformReview.violations) ? result.platformReview.violations.filter(Boolean) : [],
-        riskLevel: ["low", "medium", "high"].includes(String(result.platformReview.riskLevel || "").toLowerCase())
-          ? String(result.platformReview.riskLevel).toLowerCase()
-          : result.status === "APPROVED"
-          ? "low"
-          : "medium"
-      }
-    : {
-        platform: socialPlatform,
-        violations: [],
-        riskLevel: result.status === "APPROVED" ? "low" : "medium"
-      };
+  const normalizedReviews = normalizeEditorReviews(result, content, socialPlatform);
+  const platformReview = normalizedReviews.platformReview;
+  const channelReviews = normalizedReviews.channelReviews;
 
   if (!result.status) {
     throw new Error("Editor agent returned an invalid response shape.");
@@ -196,7 +185,22 @@ export async function editorAgent(content, facts, context = {}) {
   }
 
   result.platformReview = platformReview;
+  result.channelReviews = channelReviews;
   result.confidence = normalizeConfidence(result.confidence, result.status === "APPROVED" ? 0.82 : 0.48);
+
+  if (result.status === "APPROVED" && hasBlockingChannelIssues(channelReviews)) {
+    result.status = "REJECTED";
+    result.feedback =
+      buildChannelReviewFeedback(channelReviews) ||
+      `The draft is still not strong enough for ${socialLabel} and needs another refinement pass.`;
+    delete result.content;
+  }
+
+  if (result.status === "REJECTED" && !result.feedback) {
+    result.feedback =
+      buildChannelReviewFeedback(channelReviews) ||
+      `The draft needs stronger channel alignment before it is ready for ${socialLabel}.`;
+  }
 
   await logAgentRun("editor", {
     requestId: context.requestId,

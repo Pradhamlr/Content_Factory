@@ -138,9 +138,20 @@ function buildQualityTelemetry(review, attempts = 1, maxAttempts = MAX_ATTEMPTS)
       : review?.status === "APPROVED"
         ? 0.82
         : 0.48;
+  const platformViolations = Array.isArray(review?.platformReview?.violations) ? review.platformReview.violations.length : 0;
+  const blogViolations = Array.isArray(review?.channelReviews?.blog?.violations) ? review.channelReviews.blog.violations.length : 0;
+  const emailViolations = Array.isArray(review?.channelReviews?.email?.violations) ? review.channelReviews.email.violations.length : 0;
+  const riskPenalty =
+    review?.platformReview?.riskLevel === "high"
+      ? 12
+      : review?.platformReview?.riskLevel === "medium"
+        ? 6
+        : 0;
   const statusModifier = review?.status === "APPROVED" ? 6 : -8;
   const attemptModifier = Math.max(0, maxAttempts - attempts) * 2;
-  const score = clampQualityScore(confidence * 100 + statusModifier + attemptModifier);
+  const score = clampQualityScore(
+    confidence * 100 + statusModifier + attemptModifier - platformViolations * 6 - blogViolations * 4 - emailViolations * 4 - riskPenalty
+  );
 
   return {
     score,
@@ -745,6 +756,7 @@ async function runCampaignPipeline(input, requestId, source = createSourceDescri
         violations: [],
         riskLevel: finalReview?.status === "APPROVED" ? "low" : "medium"
       },
+      channelReviews: finalReview?.channelReviews || null,
       ai: buildAiTelemetry(agentMeta),
       quality: buildQualityTelemetry(finalReview, attempts, MAX_ATTEMPTS)
     },
@@ -1227,6 +1239,7 @@ router.post("/regenerate", async (req, res, next) => {
                 violations: [],
                 riskLevel: review?.status === "APPROVED" ? "low" : "medium"
               },
+              channelReviews: review?.channelReviews || existing?.telemetry?.channelReviews || null,
               quality: buildQualityTelemetry(review, 1, 1)
             },
         revisionHistory: appendRevision(previousRevisionHistory, channel, {
